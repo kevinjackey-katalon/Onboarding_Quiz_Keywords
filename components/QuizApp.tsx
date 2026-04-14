@@ -14,7 +14,7 @@ export interface UserAnswers {
   [questionId: number]: string | string[];
 }
 
-const QUIZ_NAME = 'Katalon Keywords & Advanced Quiz';
+const QUIZ_NAME = 'Katalon Keywords Reference Quiz';
 
 export interface QuizResult {
   name: string;

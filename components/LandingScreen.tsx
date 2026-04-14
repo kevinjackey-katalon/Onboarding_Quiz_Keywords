@@ -46,10 +46,10 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
           </div>
           <h1 style={{ fontSize: 36, fontWeight: 800, color: '#f1f5f9', margin: '0 0 16px', lineHeight: 1.2 }}>
             Katalon Studio<br />
-            <span style={{ background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Keywords &amp; Advanced Quiz</span>
+            <span style={{ background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Keywords Reference Quiz</span>
           </h1>
           <p style={{ color: '#94a3b8', fontSize: 16, margin: 0, lineHeight: 1.6 }}>
-            Enter your name to begin. Your results will be recorded for training review.
+            Test your knowledge of Katalon Studio keywords across Web, API, Mobile and Desktop platforms.
           </p>
         </div>
 

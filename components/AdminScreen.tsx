@@ -22,12 +22,17 @@ interface Props {
 const PASS_PASSWORD = 'KatalonTrue';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Configuration': '#818cf8',
-  'Locators': '#34d399',
-  'Test Creation': '#f59e0b',
-  'Debugging': '#f87171',
-  'Test Data': '#60a5fa',
-  'Test Execution': '#a78bfa',
+  'Browser Handling': '#60a5fa',
+  'UI Interaction': '#f59e0b',
+  'Verification': '#34d399',
+  'Wait Handling': '#a78bfa',
+  'Frame & Window Handling': '#f87171',
+  'Alert Handling': '#fb923c',
+  'Advanced Keywords': '#e879f9',
+  'API Testing': '#38bdf8',
+  'Mobile Testing': '#4ade80',
+  'Desktop Testing': '#facc15',
+  'Cross-Platform': '#94a3b8',
 };
 
 export default function AdminScreen({ onBack }: Props) {
