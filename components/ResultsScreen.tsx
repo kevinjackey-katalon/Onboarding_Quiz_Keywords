@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { questions } from '@/lib/questions';
 import type { QuizResult } from './QuizApp';
 
@@ -9,157 +10,142 @@ interface Props {
   onHome: () => void;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Browser Handling': '#60a5fa',
-  'UI Interaction': '#f59e0b',
-  'Verification': '#34d399',
-  'Wait Handling': '#a78bfa',
-  'Frame & Window Handling': '#f87171',
-  'Alert Handling': '#fb923c',
-  'Advanced Keywords': '#e879f9',
-  'API Testing': '#38bdf8',
-  'Mobile Testing': '#4ade80',
-  'Desktop Testing': '#facc15',
-  'Cross-Platform': '#94a3b8',
-};
+function getAnswerSummary(qIndex: number, result: QuizResult) {
+  const q = questions[qIndex];
+  const userRaw = result.answers[q.id];
+
+  if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') {
+    const ul = userRaw as string | undefined;
+    const cl = q.correctLetter || '';
+    const uOpt = q.options?.find(o => o.letter === ul);
+    const cOpt = q.options?.find(o => o.letter === cl);
+    return {
+      ok: ul === cl,
+      yours: ul ? `${ul}) ${uOpt?.text || ''}` : '(no answer)',
+      correct: `${cl}) ${cOpt?.text || ''}`,
+    };
+  }
+  if (q.type === 'Fill in the Blank') {
+    const u = String(userRaw || '').trim();
+    const c = (q.correctAnswer || '').trim();
+    const ok = u.toLowerCase().replace(/['"]/g, '') === c.toLowerCase().replace(/['"]/g, '');
+    return { ok, yours: u || '(no answer)', correct: c };
+  }
+  if (q.type === 'Drag to Order') {
+    const uo = (userRaw as string[] | undefined) || [];
+    const co = q.orderedSteps || [];
+    const ok = uo.length === co.length && uo.every((s, i) => s === co[i]);
+    return {
+      ok,
+      yours: uo.length ? uo.map((s, i) => `${i + 1}. ${s}`).join('\n') : '(no answer)',
+      correct: co.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+    };
+  }
+  return { ok: false, yours: '(no answer)', correct: '' };
+}
 
 export default function ResultsScreen({ result, onRetake, onHome }: Props) {
   const pct = Math.round((result.score / result.total) * 100);
+  const ringRef = useRef<SVGCircleElement>(null);
 
-  const getAnswerDisplay = (qIndex: number): { correct: boolean; userAnswer: string; correctAnswer: string } => {
-    const q = questions[qIndex];
-    const userRaw = result.answers[q.id];
+  useEffect(() => {
+    setTimeout(() => {
+      if (ringRef.current) ringRef.current.style.strokeDashoffset = String(440 - (pct / 100) * 440);
+    }, 100);
+  }, [pct]);
 
-    if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') {
-      const userLetter = userRaw as string | undefined;
-      const correctLetter = q.correctLetter || '';
-      const userOpt = q.options?.find(o => o.letter === userLetter);
-      const correctOpt = q.options?.find(o => o.letter === correctLetter);
-      const isCorrect = userLetter === correctLetter;
-      return {
-        correct: isCorrect,
-        userAnswer: userLetter ? `${userLetter}) ${userOpt?.text || ''}` : '(no answer)',
-        correctAnswer: `${correctLetter}) ${correctOpt?.text || ''}`,
-      };
-    }
-    if (q.type === 'Fill in the Blank') {
-      const user = String(userRaw || '').trim();
-      const correct = (q.correctAnswer || '').trim();
-      const isCorrect = user.toLowerCase().replace(/['"]/g, '') === correct.toLowerCase().replace(/['"]/g, '');
-      return { correct: isCorrect, userAnswer: user || '(no answer)', correctAnswer: correct };
-    }
-    if (q.type === 'Drag to Order') {
-      const userOrder = (userRaw as string[] | undefined) || [];
-      const correctOrder = q.orderedSteps || [];
-      const isCorrect = userOrder.length === correctOrder.length && userOrder.every((s, i) => s === correctOrder[i]);
-      return {
-        correct: isCorrect,
-        userAnswer: userOrder.length ? userOrder.map((s, i) => `${i + 1}. ${s}`).join('\n') : '(no answer)',
-        correctAnswer: correctOrder.map((s, i) => `${i + 1}. ${s}`).join('\n'),
-      };
-    }
-    return { correct: false, userAnswer: '(no answer)', correctAnswer: '' };
-  };
+  let title = '', sub = '';
+  if (pct >= 90)       { title = '🏆 Outstanding!';     sub = 'Excellent mastery of Katalon keywords.'; }
+  else if (pct >= 75)  { title = '✅ Well Done!';        sub = 'Strong understanding with a few areas to review.'; }
+  else if (pct >= 60)  { title = '📘 Good Effort';       sub = 'Solid foundation — revisit the sections below.'; }
+  else                 { title = '🔄 Keep Practicing';   sub = 'Review the training material and retake the quiz.'; }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f1117' }}>
-      {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>← Home</button>
-      </div>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 24px 80px', textAlign: 'center' }}>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px' }}>
-        {/* Score card */}
-        <div style={{
-          background: result.passed ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)',
-          border: `1px solid ${result.passed ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
-          borderRadius: 20, padding: '36px 32px', textAlign: 'center', marginBottom: 32,
-        }}>
-          <div style={{ fontSize: 64, marginBottom: 8 }}>{result.passed ? '🎉' : '📚'}</div>
-          <h1 style={{ color: '#f1f5f9', fontSize: 28, fontWeight: 800, margin: '0 0 8px' }}>
-            {result.passed ? 'Congratulations!' : 'Keep Practising!'}
-          </h1>
-          <p style={{ color: '#94a3b8', fontSize: 16, margin: '0 0 24px' }}>
-            {result.name}{result.organisation ? ` · ${result.organisation}` : ''}
-          </p>
-          <div style={{ fontSize: 64, fontWeight: 900, color: result.passed ? '#34d399' : '#f87171', lineHeight: 1, marginBottom: 8 }}>{pct}%</div>
-          <p style={{ color: '#94a3b8', fontSize: 16, margin: '0 0 24px' }}>
-            {result.score} / {result.total} correct
-          </p>
-          <span style={{
-            display: 'inline-block', padding: '6px 18px', borderRadius: 20,
-            background: result.passed ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)',
-            color: result.passed ? '#34d399' : '#f87171',
-            fontWeight: 700, fontSize: 14, letterSpacing: '0.06em', textTransform: 'uppercase',
-          }}>
-            {result.passed ? '✓ Passed' : '✗ Not Passed'}
-          </span>
+        {/* SVG score ring */}
+        <div style={{ width: 160, height: 160, margin: '0 auto 32px', position: 'relative' }}>
+          <svg viewBox="0 0 160 160" width="160" height="160" style={{ transform: 'rotate(-90deg)' }}>
+            <defs>
+              <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#4fffb0" />
+                <stop offset="100%" stopColor="#00c8ff" />
+              </linearGradient>
+            </defs>
+            <circle fill="none" stroke="var(--border)" strokeWidth={10} cx={80} cy={80} r={70} />
+            <circle
+              ref={ringRef}
+              fill="none"
+              stroke="url(#scoreGrad)"
+              strokeWidth={10}
+              strokeLinecap="round"
+              strokeDasharray={440}
+              strokeDashoffset={440}
+              cx={80} cy={80} r={70}
+              style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1) .3s' }}
+            />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 36, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{result.score}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>/ {result.total}</div>
+          </div>
         </div>
 
-        {/* Category breakdown */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '24px', marginBottom: 32 }}>
-          <h2 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 700, margin: '0 0 20px' }}>Performance by Topic</h2>
-          {Object.entries(result.categoryScores).map(([cat, scores]) => {
-            const catPct = scores.total > 0 ? Math.round((scores.correct / scores.total) * 100) : 0;
-            const color = CATEGORY_COLORS[cat] || '#94a3b8';
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700, marginBottom: 10 }}>{title}</div>
+        <div style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 40, lineHeight: 1.6 }}>
+          {sub} You scored {result.score} out of {result.total} ({pct}%).
+        </div>
+
+        {/* Category stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 12, marginBottom: 32 }}>
+          {Object.entries(result.categoryScores).filter(([, s]) => s.total > 0).map(([cat, s]) => {
+            const p = Math.round((s.correct / s.total) * 100);
             return (
-              <div key={cat} style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ color: '#cbd5e1', fontSize: 14, fontWeight: 600 }}>{cat}</span>
-                  <span style={{ color: color, fontSize: 14, fontWeight: 700 }}>{scores.correct}/{scores.total}</span>
-                </div>
-                <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${catPct}%`, background: color, borderRadius: 4, transition: 'width 0.8s ease' }} />
+              <div key={cat} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'left' }}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{cat}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>{s.correct}/{s.total}</div>
+                <div style={{ height: 3, background: 'var(--border)', borderRadius: 4, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: 'linear-gradient(90deg, var(--accent), var(--accent2))', borderRadius: 4, width: `${p}%`, transition: 'width 1s cubic-bezier(.4,0,.2,1) .5s' }} />
                 </div>
               </div>
             );
           })}
-          {result.weakestCategory && (
-            <p style={{ color: '#f59e0b', fontSize: 13, margin: '16px 0 0', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '10px 14px' }}>
-              💡 Focus area: <strong>{result.weakestCategory}</strong>
-            </p>
-          )}
         </div>
 
-        {/* Question review */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '24px', marginBottom: 32 }}>
-          <h2 style={{ color: '#f1f5f9', fontSize: 16, fontWeight: 700, margin: '0 0 20px' }}>Question Review</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {questions.map((q, idx) => {
-              const { correct, userAnswer, correctAnswer } = getAnswerDisplay(idx);
-              return (
-                <div key={q.id} style={{
-                  background: correct ? 'rgba(52,211,153,0.06)' : 'rgba(248,113,113,0.06)',
-                  border: `1px solid ${correct ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`,
-                  borderRadius: 12, padding: '14px 16px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }}>{correct ? '✅' : '❌'}</span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ color: '#cbd5e1', fontSize: 14, margin: '0 0 8px', fontWeight: 500, whiteSpace: 'pre-line' }}>{idx + 1}. {q.question}</p>
-                      {!correct && (
-                        <div style={{ fontSize: 13 }}>
-                          <p style={{ color: '#f87171', margin: '0 0 4px' }}>Your answer: <span style={{ fontFamily: q.type === 'Drag to Order' ? 'inherit' : 'monospace', whiteSpace: 'pre-line' }}>{userAnswer}</span></p>
-                          <p style={{ color: '#34d399', margin: 0 }}>Correct: <span style={{ fontFamily: q.type === 'Drag to Order' ? 'inherit' : 'monospace', whiteSpace: 'pre-line' }}>{correctAnswer}</span></p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+        {/* Breakdown */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', marginBottom: 32, textAlign: 'left' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: 1, color: 'var(--muted)', textTransform: 'uppercase' }}>
+            Question Review
           </div>
+          {questions.map((q, idx) => {
+            const { ok, yours, correct } = getAnswerSummary(idx, result);
+            return (
+              <div key={q.id} style={{ padding: '14px 24px', borderBottom: idx < questions.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'flex-start', gap: 14, fontSize: 13 }}>
+                <div style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{ok ? '✅' : '❌'}</div>
+                <div>
+                  <div style={{ color: 'var(--text)', lineHeight: 1.4, fontSize: 13 }}>{q.question.split('\n')[0]}</div>
+                  {!ok && (
+                    <>
+                      <div style={{ color: 'var(--accent3)', fontSize: 12, marginTop: 3, whiteSpace: 'pre-line' }}>Yours: {yours}</div>
+                      <div style={{ color: 'var(--accent)', fontSize: 12, marginTop: 2, whiteSpace: 'pre-line' }}>Correct: {correct}</div>
+                    </>
+                  )}
+                  {ok && <div style={{ color: 'var(--accent)', fontSize: 12, marginTop: 3 }}>{correct}</div>}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={onHome} style={{ flex: 1, padding: '14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#94a3b8', fontSize: 15, cursor: 'pointer', fontWeight: 600 }}>
-            ← Home
-          </button>
-          <button onClick={onRetake} style={{ flex: 1, padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-            ↺ Retake Quiz
-          </button>
-        </div>
+        <button
+          onClick={onRetake}
+          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent2))', color: '#000', border: 'none', borderRadius: 10, padding: '14px 40px', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'opacity .2s, transform .15s' }}
+          onMouseOver={e => { (e.target as HTMLElement).style.opacity = '.88'; (e.target as HTMLElement).style.transform = 'translateY(-2px)'; }}
+          onMouseOut={e => { (e.target as HTMLElement).style.opacity = '1'; (e.target as HTMLElement).style.transform = 'translateY(0)'; }}
+        >
+          ↺ Retake Quiz
+        </button>
       </div>
     </div>
   );

@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 
 interface QuizResultRecord {
   id: string;
+  quiz: string;
   name: string;
   organisation: string;
-  quiz: string;
   score: number;
   total: number;
   passed: boolean;
@@ -15,263 +15,210 @@ interface QuizResultRecord {
   weakestCategory: string;
 }
 
-interface Props {
-  onBack: () => void;
-}
+interface Props { onBack: () => void; }
 
 const PASS_PASSWORD = 'KatalonTrue';
+const CATS = ['Browser Handling','UI Interaction','Verification','Wait Handling','Frame & Window Handling','Alert Handling','Advanced Keywords','API Testing','Mobile Testing','Desktop Testing','Cross-Platform'];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Browser Handling': '#60a5fa',
-  'UI Interaction': '#f59e0b',
-  'Verification': '#34d399',
-  'Wait Handling': '#a78bfa',
-  'Frame & Window Handling': '#f87171',
-  'Alert Handling': '#fb923c',
-  'Advanced Keywords': '#e879f9',
-  'API Testing': '#38bdf8',
-  'Mobile Testing': '#4ade80',
-  'Desktop Testing': '#facc15',
-  'Cross-Platform': '#94a3b8',
-};
+function esc(s: string) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 export default function AdminScreen({ onBack }: Props) {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pwError, setPwError] = useState(false);
   const [results, setResults] = useState<QuizResultRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [clearConfirm, setClearConfirm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [allCategories, setAllCategories] = useState<string[]>([]);
 
-  const handleLogin = () => {
-    if (password === PASS_PASSWORD) {
-      setAuthenticated(true);
-      setPasswordError('');
-      loadResults();
-    } else {
-      setPasswordError('Incorrect password. Try again.');
-    }
+  const login = () => {
+    if (pw === PASS_PASSWORD) { setAuthed(true); setPwError(false); load(); }
+    else { setPwError(true); setPw(''); }
   };
 
-  const loadResults = async () => {
+  const load = async () => {
     setLoading(true);
-    try {
-      const res = await fetch('/api/results');
-      const data = await res.json();
-      setResults(data.results || []);
-      const cats = new Set<string>();
-      for (const r of data.results || []) {
-        Object.keys(r.categoryScores || {}).forEach(c => cats.add(c));
-      }
-      setAllCategories(Array.from(cats));
-    } catch {
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+    try { const r = await fetch('/api/results'); const d = await r.json(); setResults(d.results || []); }
+    catch { setResults([]); }
+    finally { setLoading(false); }
   };
 
-  const handleClear = async () => {
-    try {
-      await fetch('/api/results', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: PASS_PASSWORD }),
-      });
-      setResults([]);
-      setClearConfirm(false);
-    } catch {}
+  const clearAll = async () => {
+    if (!confirm('Clear ALL quiz results? This cannot be undone.')) return;
+    try { await fetch('/api/results', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: PASS_PASSWORD }) }); }
+    catch {}
+    load();
   };
 
   const exportCSV = () => {
-    const headers = ['Quiz', 'Name', 'Organisation', 'Score', 'Percentage', 'Result', 'Date', 'Weakest Area', ...allCategories.map(c => `${c} Score`)];
-    const rows = results.map(r => {
+    if (!results.length) { alert('No results to export.'); return; }
+    const headers = ['#','Quiz','Name','Organisation','Score','Percentage','Passed','Timestamp',...CATS];
+    const rows = results.map((r, i) => {
       const pct = Math.round((r.score / r.total) * 100);
-      const catScores = allCategories.map(c => {
-        const s = r.categoryScores?.[c];
-        return s ? `${s.correct}/${s.total}` : 'N/A';
-      });
-      return [
-        `"${r.quiz || 'Katalon Keywords & Advanced Quiz'}"`,
-        `"${r.name}"`,
-        `"${r.organisation || ''}"`,
-        `${r.score}/${r.total}`,
-        `${pct}%`,
-        r.passed ? 'Pass' : 'Fail',
-        new Date(r.date).toLocaleString(),
-        `"${r.weakestCategory}"`,
-        ...catScores
-      ];
+      const cats = CATS.map(c => { const d = r.categoryScores?.[c]; return d ? `${d.correct}/${d.total}` : 'N/A'; });
+      return [i+1, `"${r.quiz||''}"`, `"${r.name}"`, `"${r.organisation||''}"`, `${r.score}/${r.total}`, `${pct}%`, r.passed?'Yes':'No', r.date, ...cats];
     });
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `katalon_quiz_results_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = `katalon-quiz-results-${Date.now()}.csv`; a.click();
   };
 
-  // Category performance across all attempts
-  const categoryStats = allCategories.map(cat => {
-    let correct = 0, total = 0;
-    for (const r of results) {
-      const s = r.categoryScores?.[cat];
-      if (s) { correct += s.correct; total += s.total; }
-    }
-    return { cat, correct, total, pct: total > 0 ? Math.round((correct / total) * 100) : 0 };
-  });
-
-  if (!authenticated) {
+  if (!authed) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '40px 36px', maxWidth: 420, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
-          <h2 style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>Admin Access</h2>
-          <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 24px' }}>Enter the admin password to view trainee results.</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '48px 40px', maxWidth: 400, width: '100%', textAlign: 'center', animation: 'slideUp .5s ease both', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--accent3), var(--accent2))', borderRadius: '20px 20px 0 0' }} />
+          <div style={{ fontSize: 40, marginBottom: 16 }}>🔐</div>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Admin Access</h2>
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 28 }}>Enter the admin password to view trainee results.</p>
           <input
             type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder="Password"
-            style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${passwordError ? '#f87171' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 15, outline: 'none', marginBottom: 8 }}
+            value={pw}
+            onChange={e => setPw(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && login()}
+            placeholder="••••••••••••"
+            style={{ width: '100%', background: 'var(--surface2)', border: `1.5px solid ${pwError ? 'var(--accent3)' : 'var(--border)'}`, borderRadius: 10, padding: '14px 18px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', transition: 'border-color .2s', marginBottom: 10, letterSpacing: 3, display: 'block' }}
           />
-          {passwordError && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 12px' }}>{passwordError}</p>}
-          <button
-            onClick={handleLogin}
-            style={{ width: '100%', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: 'white', padding: '12px', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 12 }}
-          >
+          {pwError && <div style={{ color: 'var(--accent3)', fontSize: 12, fontFamily: 'var(--font-mono)', marginBottom: 10 }}>Incorrect password. Try again.</div>}
+          <button onClick={login} style={{ width: '100%', background: 'linear-gradient(135deg, var(--accent3), #ff8fa3)', color: '#fff', border: 'none', borderRadius: 10, padding: 13, fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'opacity .2s, transform .15s', letterSpacing: '.5px', marginBottom: 16 }}>
             Enter Dashboard
           </button>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>← Back to Quiz</button>
+          <span onClick={onBack} style={{ color: 'var(--muted)', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', transition: 'color .2s' }}
+            onMouseOver={e => (e.target as HTMLElement).style.color = 'var(--accent)'}
+            onMouseOut={e => (e.target as HTMLElement).style.color = 'var(--muted)'}
+          >← Back to Quiz</span>
         </div>
       </div>
     );
   }
 
-  const passCount = results.filter(r => r.passed).length;
-  const avgScore = results.length > 0 ? Math.round(results.reduce((a, r) => a + (r.score / r.total) * 100, 0) / results.length) : 0;
+  const total = results.length;
+  const passed = results.filter(r => r.passed).length;
+  const avg = total ? Math.round(results.reduce((s, r) => s + Math.round((r.score/r.total)*100), 0) / total) : 0;
+  const high = total ? Math.max(...results.map(r => Math.round((r.score/r.total)*100))) : 0;
+
+  const kpis = [
+    { label: 'Total Attempts', val: total, sub: 'all time', cls: 'blue' },
+    { label: 'Pass Rate', val: `${total ? Math.round((passed/total)*100) : 0}%`, sub: `${passed} of ${total} passed`, cls: 'green' },
+    { label: 'Avg Score', val: `${avg}%`, sub: 'pass mark: 75%', cls: 'yellow' },
+    { label: 'Top Score', val: `${high}%`, sub: 'best attempt', cls: high >= 75 ? 'green' : 'red' },
+  ];
+
+  const kpiColor: Record<string, string> = { green: 'var(--accent)', blue: 'var(--accent2)', red: 'var(--accent3)', yellow: '#ffd166' };
+  const kpiBorderColor: Record<string, string> = { green: 'var(--accent)', blue: 'var(--accent2)', red: 'var(--accent3)', yellow: '#ffd166' };
+
+  // Category aggregation
+  const agg: Record<string, { correct: number; total: number }> = {};
+  CATS.forEach(c => { agg[c] = { correct: 0, total: 0 }; });
+  results.forEach(r => { if (r.categoryScores) Object.entries(r.categoryScores).forEach(([c, d]) => { if (agg[c]) { agg[c].correct += d.correct; agg[c].total += d.total; } }); });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f1117' }}>
-      {/* Header */}
-      <div style={{ padding: '16px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>← Back to Quiz</button>
-          <h1 style={{ color: '#f1f5f9', fontSize: 18, fontWeight: 700, margin: 0 }}>Training Dashboard</h1>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={exportCSV} disabled={results.length === 0} style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#93c5fd', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-            ⬇ Export CSV
-          </button>
-          <button onClick={() => setClearConfirm(true)} disabled={results.length === 0} style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-            🗑 Clear All
-          </button>
-        </div>
-      </div>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '40px 24px 80px' }}>
 
-      {clearConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: '#1a1d2e', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 32, maxWidth: 380, textAlign: 'center' }}>
-            <p style={{ color: '#f1f5f9', fontSize: 16, margin: '0 0 20px' }}>Delete all <strong>{results.length}</strong> result{results.length !== 1 ? 's' : ''}? This cannot be undone.</p>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => setClearConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#94a3b8', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleClear} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#ef4444', color: 'white', fontWeight: 700, cursor: 'pointer' }}>Delete All</button>
-            </div>
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36, flexWrap: 'wrap', gap: 12 }}>
+          <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700 }}>
+            Training <span style={{ color: 'var(--accent3)' }}>Dashboard</span>
+          </h1>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[
+              { label: '⬇ Export CSV', onClick: exportCSV, extra: { borderColor: 'rgba(79,255,176,.3)', color: 'var(--accent)' } },
+              { label: '🗑 Clear All', onClick: clearAll, extra: {} },
+              { label: '← Back to Quiz', onClick: onBack, extra: {} },
+            ].map(btn => (
+              <button key={btn.label} onClick={btn.onClick}
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '9px 18px', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, letterSpacing: '.5px', cursor: 'pointer', transition: 'border-color .2s, color .2s', ...btn.extra }}
+                onMouseOver={e => { const el = e.currentTarget; el.style.borderColor = btn.label.includes('Clear') ? 'var(--accent3)' : 'var(--accent)'; el.style.color = btn.label.includes('Clear') ? 'var(--accent3)' : 'var(--accent)'; }}
+                onMouseOut={e => { const el = e.currentTarget; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--text)'; }}
+              >
+                {btn.label}
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#64748b' }}>Loading results...</div>
+          <div style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 13, padding: '8px 0' }}>Loading results...</div>
         ) : (
           <>
-            {/* Summary stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 32 }}>
-              {[
-                { label: 'Total Attempts', value: results.length.toString(), color: '#60a5fa' },
-                { label: 'Pass Rate', value: results.length > 0 ? `${Math.round((passCount / results.length) * 100)}%` : 'N/A', color: '#34d399' },
-                { label: 'Average Score', value: results.length > 0 ? `${avgScore}%` : 'N/A', color: '#f59e0b' },
-                { label: 'Passed', value: `${passCount}/${results.length}`, color: '#a78bfa' },
-              ].map(s => (
-                <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '20px 18px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: s.color, marginBottom: 4 }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+            {/* KPI row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 14, marginBottom: 28 }}>
+              {kpis.map(k => (
+                <div key={k.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: kpiBorderColor[k.cls] }} />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'var(--font-mono)', marginBottom: 8 }}>{k.label}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 32, fontWeight: 700, lineHeight: 1, color: kpiColor[k.cls] }}>{k.val}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{k.sub}</div>
                 </div>
               ))}
             </div>
 
             {/* Category performance */}
-            {results.length > 0 && (
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24, marginBottom: 32 }}>
-                <h2 style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700, margin: '0 0 18px' }}>Performance by Category (All Attempts)</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  {categoryStats.map(({ cat, correct, total, pct }) => {
-                    const color = CATEGORY_COLORS[cat] || '#94a3b8';
-                    return (
-                      <div key={cat}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 600 }}>{cat}</span>
-                          <span style={{ color, fontSize: 13, fontWeight: 700 }}>{pct}%</span>
-                        </div>
-                        <div style={{ height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4 }} />
-                        </div>
-                        <div style={{ color: '#4a5568', fontSize: 11, marginTop: 4 }}>{correct} of {total} questions correct</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+              Performance by Category (All Attempts)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12, marginBottom: 28 }}>
+              {total === 0 ? <p style={{ color: 'var(--muted)', fontSize: 13, gridColumn: '1/-1', padding: '8px 0' }}>No results yet.</p> : CATS.map(cat => {
+                const d = agg[cat]; const p = d.total ? Math.round((d.correct/d.total)*100) : 0;
+                const col = p >= 75 ? '#4fffb0' : p >= 50 ? '#ffd166' : '#ff5f87';
+                return (
+                  <div key={cat} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{cat}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: col }}>{p}%</div>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 4, background: col, width: `${p}%`, transition: 'width 1s cubic-bezier(.4,0,.2,1) .3s' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             {/* Results table */}
-            {results.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#4a5568' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📊</div>
-                <p>No results yet. Results will appear here after trainees complete the quiz.</p>
-              </div>
-            ) : (
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                    <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                        {['#', 'Quiz', 'Name', 'Organisation', 'Score', 'Result', 'Date & Time', 'Weakest Area'].map(h => (
-                          <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-                        ))}
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+              All Attempts
+            </div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', marginBottom: 28, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
+                <thead>
+                  <tr>
+                    {['#','Quiz','Name','Organisation','Score','Result','Date & Time','Weakest Area'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {total === 0 ? (
+                    <tr><td colSpan={8}>
+                      <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--muted)' }}>
+                        <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+                        <p style={{ fontSize: 14, lineHeight: 1.6 }}>No quiz attempts yet.<br />Results will appear here once trainees complete the quiz.</p>
+                      </div>
+                    </td></tr>
+                  ) : [...results].reverse().map((r, i) => {
+                    const pct = Math.round((r.score/r.total)*100);
+                    const bc = pct >= 75 ? { bg: 'rgba(79,255,176,.15)', color: 'var(--accent)' } : pct >= 60 ? { bg: 'rgba(255,209,102,.15)', color: '#ffd166' } : { bg: 'rgba(255,95,135,.15)', color: 'var(--accent3)' };
+                    const d = new Date(r.date);
+                    const ds = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+                    const ts = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+                    let weak = '—';
+                    if (r.categoryScores) { let mp = Infinity, mc = ''; Object.entries(r.categoryScores).forEach(([c, data]) => { if (data.total > 0) { const p2 = data.correct/data.total; if (p2 < mp) { mp = p2; mc = c; } } }); if (mc) weak = `${mc} (${Math.round(mp*100)}%)`; }
+                    return (
+                      <tr key={r.id || i} style={{}} onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.02)'} onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{results.length - i}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--accent2)', fontSize: 12 }}>{r.quiz || '—'}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{r.name}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12 }}>{r.organisation || '—'}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)' }}>{r.score}/{r.total} <span style={{ color: 'var(--muted)' }}>({pct}%)</span></td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)' }}><span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, background: bc.bg, color: bc.color }}>{pct >= 75 ? 'PASS' : 'FAIL'}</span></td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{ds} {ts}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--accent3)', fontSize: 12 }}>{weak}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((r, idx) => {
-                        const pct = Math.round((r.score / r.total) * 100);
-                        return (
-                          <tr key={r.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '12px 16px', color: '#4a5568' }}>{idx + 1}</td>
-                            <td style={{ padding: '12px 16px', color: '#60a5fa', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.quiz || 'Katalon Keywords & Advanced Quiz'}</td>
-                            <td style={{ padding: '12px 16px', color: '#e2e8f0', fontWeight: 600 }}>{r.name}</td>
-                            <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{r.organisation || '—'}</td>
-                            
-                            <td style={{ padding: '12px 16px', color: r.passed ? '#34d399' : '#f87171', fontWeight: 700 }}>{r.score}/{r.total} ({pct}%)</td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: r.passed ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: r.passed ? '#34d399' : '#f87171' }}>
-                                {r.passed ? 'Pass' : 'Fail'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(r.date).toLocaleString()}</td>
-                            <td style={{ padding: '12px 16px', color: '#f59e0b', fontSize: 13 }}>{r.weakestCategory}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

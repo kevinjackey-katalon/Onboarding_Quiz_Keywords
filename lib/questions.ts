@@ -9,6 +9,7 @@ export interface Question {
   correctLetter?: string;
   correctAnswer?: string;
   orderedSteps?: string[];
+  explanation?: string;
 }
 
 export const questions: Question[] = [
@@ -24,6 +25,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.initBrowser()' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.openBrowser() launches a new browser instance. You can optionally pass a URL to open immediately, or leave it blank and navigate later with WebUI.navigateToUrl().',
   },
   {
     id: 1, category: 'Browser Handling', type: 'Multiple Choice',
@@ -35,6 +37,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.loadPage(url)' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.navigateToUrl() directs an already-open browser to a given URL. WebUI.openBrowser() is for launching a new instance, not mid-test navigation.',
   },
   {
     id: 2, category: 'Browser Handling', type: 'Multiple Choice',
@@ -46,16 +49,19 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.refresh() then WebUI.closeBrowser()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.closeBrowser() closes the active browser instance and ends the WebDriver session. For multi-tab tests, close individual tabs first with WebUI.closeWindowIndex() before calling closeBrowser().',
   },
   {
     id: 3, category: 'Browser Handling', type: 'Fill in the Blank',
     question: 'Complete the keyword that reloads the current page without changing the URL:\nWebUI.________()',
     correctAnswer: 'refresh',
+    explanation: 'WebUI.refresh() reloads the current page, equivalent to pressing F5. Useful after state-changing actions when you want to verify persisted data.',
   },
   {
     id: 4, category: 'Browser Handling', type: 'Fill in the Blank',
     question: 'Complete the keyword that makes the browser window fill the screen:\nWebUI.______________()',
     correctAnswer: 'maximizeWindow',
+    explanation: 'WebUI.maximizeWindow() maximizes the browser window to fill the screen. Best called early in the test setup to ensure consistent viewport dimensions across runs.',
   },
 
   // ── UI INTERACTION ────────────────────────────────────────────────────────
@@ -69,6 +75,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'enhancedClick() triggers a double-click event' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.enhancedClick() is a resilient alternative that scrolls the element into view, waits for it to be interactable, and falls back to a JavaScript click if the native Selenium click fails — ideal for stubborn or partially-visible elements.',
   },
   {
     id: 6, category: 'UI Interaction', type: 'Multiple Choice',
@@ -80,6 +87,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.inputText()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.setText() clears any existing content before typing the new value — all in one call. WebUI.sendKeys() only appends; you would need a separate clearText() call first.',
   },
   {
     id: 7, category: 'UI Interaction', type: 'Multiple Choice',
@@ -91,6 +99,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.highlight()' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.mouseOver() moves the mouse cursor over the target element, triggering any CSS :hover effects or JavaScript mouseover events — perfect for revealing hidden dropdown menus.',
   },
   {
     id: 8, category: 'UI Interaction', type: 'Multiple Choice',
@@ -102,11 +111,13 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.executeJavaScript() with a file reader' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.uploadFile() targets an <input type="file"> element and sets the file path directly, bypassing the OS file picker dialog. Pass the full absolute path to the file.',
   },
   {
     id: 9, category: 'UI Interaction', type: 'Fill in the Blank',
     question: 'Complete the keyword that moves an element from one location and drops it onto another:\nWebUI._________________(sourceObject, destinationObject)',
     correctAnswer: 'dragAndDropToObject',
+    explanation: 'WebUI.dragAndDropToObject() performs a drag-and-drop from the source TestObject to the destination TestObject, using Selenium Actions under the hood.',
   },
   {
     id: 10, category: 'UI Interaction', type: 'Multiple Choice',
@@ -118,6 +129,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.keyPress()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.sendKeys() sends keyboard input including special keys via Selenium Keys constants (e.g. Keys.TAB, Keys.ENTER). It does not clear the field first, making it ideal for key presses rather than text entry.',
   },
   {
     id: 11, category: 'UI Interaction', type: 'Spot the Bug',
@@ -129,13 +141,14 @@ export const questions: Question[] = [
       { letter: 'D', text: "WebUI.setText(findTestObject('txt_password'), 'secret')" },
     ],
     correctLetter: 'C',
-    correctAnswer: "Line 3: WebUI.sendKeys() does not clear existing text — WebUI.setText() should be used for both fields",
+    correctAnswer: "Line C: WebUI.sendKeys() does not clear existing text — WebUI.setText() should be used to clear and type in a single call",
+    explanation: "WebUI.sendKeys() appends keystrokes without clearing first. If the username field already has a value, the result will be garbled. WebUI.setText() is the correct keyword as it clears before typing.",
   },
 
   // ── DROPDOWN / SELECTION ──────────────────────────────────────────────────
   {
     id: 12, category: 'UI Interaction', type: 'Multiple Choice',
-    question: 'A dropdown\'s <option> elements have value="AU" but display "Australia". Which keyword selects by the hidden value attribute?',
+    question: "A dropdown's <option> elements have value=\"AU\" but display \"Australia\". Which keyword selects by the hidden value attribute?",
     options: [
       { letter: 'A', text: 'WebUI.selectOptionByLabel()' },
       { letter: 'B', text: 'WebUI.selectOptionByIndex()' },
@@ -143,6 +156,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.selectOptionByText()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.selectOptionByValue() matches the HTML value attribute (e.g. value="AU"), not the visible text. Use selectOptionByLabel() when matching the displayed text like "Australia".',
   },
 
   // ── VERIFICATION ──────────────────────────────────────────────────────────
@@ -156,6 +170,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'verifyElementVisible() throws an exception on failure; verifyElementPresent() returns false' },
     ],
     correctLetter: 'B',
+    explanation: 'verifyElementPresent() confirms the element exists in the DOM (even if hidden with display:none). verifyElementVisible() goes further — it also checks the element is rendered and visible to the user.',
   },
   {
     id: 14, category: 'Verification', type: 'Multiple Choice',
@@ -167,6 +182,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.verifyContains()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.verifyMatch() compares two strings and supports regex patterns in the expected value. This makes it powerful for partial or pattern-based assertions where exact equality is too strict.',
   },
   {
     id: 15, category: 'Verification', type: 'Multiple Choice',
@@ -178,16 +194,19 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.verifyNotEqual()' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.verifyElementNotPresent() asserts that the element does not exist anywhere in the DOM — the correct negative check after a delete or removal action.',
   },
   {
     id: 16, category: 'Verification', type: 'Fill in the Blank',
-    question: 'Complete the keyword that reads visible text from a UI element and returns it as a String:\nString label = WebUI._______(findTestObject(\'lbl_status\'))',
+    question: "Complete the keyword that reads visible text from a UI element and returns it as a String:\nString label = WebUI._______(findTestObject('lbl_status'))",
     correctAnswer: 'getText',
+    explanation: 'WebUI.getText() retrieves the visible text content of an element (its innerText). The return value can be stored in a variable and used in subsequent assertions.',
   },
   {
     id: 17, category: 'Verification', type: 'Fill in the Blank',
-    question: 'Complete the keyword that retrieves the value of an HTML attribute (e.g. "href" or "class") from an element:\nString href = WebUI.____________(findTestObject(\'lnk_home\'), \'href\')',
+    question: "Complete the keyword that retrieves the value of an HTML attribute (e.g. \"href\" or \"class\") from an element:\nString href = WebUI.____________(findTestObject('lnk_home'), 'href')",
     correctAnswer: 'getAttribute',
+    explanation: "WebUI.getAttribute() reads any HTML attribute from an element by name. Use it to extract values like href, src, class, or data-* attributes for assertion or later use.",
   },
   {
     id: 18, category: 'Verification', type: 'Multiple Choice',
@@ -199,19 +218,21 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.getText()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.verifyTextPresent() scans the entire page source for the given substring. It does not require a specific element locator, making it ideal for checking banner or toast messages.',
   },
 
   // ── WAIT HANDLING ─────────────────────────────────────────────────────────
   {
     id: 19, category: 'Wait Handling', type: 'Multiple Choice',
-    question: 'Which wait keyword should be preferred over WebUI.delay() for most dynamic pages, and why?',
+    question: "Which wait keyword should be preferred over WebUI.delay() for most dynamic pages, and why?",
     options: [
-      { letter: 'A', text: 'WebUI.waitForPageLoad() — it\'s faster because it uses a fixed 1 s poll' },
-      { letter: 'B', text: 'WebUI.waitForElementVisible() — it returns as soon as the condition is met, reducing unnecessary wait time' },
-      { letter: 'C', text: 'WebUI.delay() — it is the only keyword that works cross-browser' },
-      { letter: 'D', text: 'WebUI.waitForElementClickable() — it automatically retries the action after waiting' },
+      { letter: 'A', text: "WebUI.waitForPageLoad() — it's faster because it uses a fixed 1 s poll" },
+      { letter: 'B', text: "WebUI.waitForElementVisible() — it returns as soon as the condition is met, reducing unnecessary wait time" },
+      { letter: 'C', text: "WebUI.delay() — it is the only keyword that works cross-browser" },
+      { letter: 'D', text: "WebUI.waitForElementClickable() — it automatically retries the action after waiting" },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.waitForElementVisible() polls until the condition is met, then continues immediately — avoiding the fixed sleep of delay(). This makes tests faster and more reliable on dynamic pages.',
   },
   {
     id: 20, category: 'Wait Handling', type: 'Multiple Choice',
@@ -223,11 +244,13 @@ export const questions: Question[] = [
       { letter: 'D', text: 'It is deprecated and should never be used' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.delay() is a static sleep — it always waits the full duration regardless of page state. Use it sparingly, only when there is no observable DOM or network condition to poll against.',
   },
   {
     id: 21, category: 'Wait Handling', type: 'Fill in the Blank',
     question: 'Complete the keyword that waits until the full page (HTML + resources) has finished loading:\nWebUI.___________________(timeout)',
     correctAnswer: 'waitForPageLoad',
+    explanation: 'WebUI.waitForPageLoad() blocks until the browser reports the page readyState as "complete". The timeout parameter (in seconds) specifies how long to wait before failing.',
   },
 
   // ── FRAME & WINDOW HANDLING ───────────────────────────────────────────────
@@ -241,6 +264,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.focusFrame()' },
     ],
     correctLetter: 'B',
+    explanation: 'WebUI.switchToFrame() transfers WebDriver focus into the specified iframe. Any element interactions after this call target the iframe context, not the main page.',
   },
   {
     id: 23, category: 'Frame & Window Handling', type: 'Multiple Choice',
@@ -252,17 +276,19 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.switchToWindowIndex(0)' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.switchToDefaultContent() exits all frames and returns WebDriver focus to the top-level document. Always call this after completing iframe interactions before touching main-page elements.',
   },
   {
     id: 24, category: 'Frame & Window Handling', type: 'Multiple Choice',
-    question: 'A click opens a new browser tab with a known page title "Checkout". Which keyword switches to that tab?',
+    question: "A click opens a new browser tab with a known page title \"Checkout\". Which keyword switches to that tab?",
     options: [
       { letter: 'A', text: 'WebUI.switchToWindowIndex(1)' },
-      { letter: 'B', text: 'WebUI.switchToWindowTitle(\'Checkout\')' },
-      { letter: 'C', text: 'WebUI.switchToWindowUrl(\'checkout\')' },
-      { letter: 'D', text: 'WebUI.switchToFrame(\'Checkout\')' },
+      { letter: 'B', text: "WebUI.switchToWindowTitle('Checkout')" },
+      { letter: 'C', text: "WebUI.switchToWindowUrl('checkout')" },
+      { letter: 'D', text: "WebUI.switchToFrame('Checkout')" },
     ],
     correctLetter: 'B',
+    explanation: "WebUI.switchToWindowTitle() switches to the first browser tab whose title matches the given string. Use switchToWindowIndex() when you know the tab position, or switchToWindowUrl() when matching by URL.",
   },
   {
     id: 25, category: 'Frame & Window Handling', type: 'Drag to Order',
@@ -274,6 +300,7 @@ export const questions: Question[] = [
       'Call WebUI.switchToDefaultContent() to return to the main document',
       'Continue interacting with elements in the main page',
     ],
+    explanation: 'Always switch into the frame before interacting with its elements, then switch back to default content to resume working with the main document. Forgetting to switch back is the most common iframe bug.',
   },
 
   // ── ALERT HANDLING ────────────────────────────────────────────────────────
@@ -287,11 +314,13 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.cancelAlert()' },
     ],
     correctLetter: 'C',
+    explanation: 'WebUI.dismissAlert() clicks the Cancel (dismiss) button on a confirm() or prompt() dialog. WebUI.acceptAlert() clicks OK/Accept instead.',
   },
   {
     id: 27, category: 'Alert Handling', type: 'Fill in the Blank',
     question: 'Complete the keyword that reads the message text from a JavaScript alert before dismissing it:\nString msg = WebUI.______________()',
     correctAnswer: 'getAlertText',
+    explanation: 'WebUI.getAlertText() returns the text content of the currently displayed alert. Always call it before acceptAlert() or dismissAlert() — closing the dialog first makes the text unretrievable.',
   },
 
   // ── JAVASCRIPT & DYNAMIC OBJECTS ─────────────────────────────────────────
@@ -305,10 +334,11 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.evalJS()' },
     ],
     correctLetter: 'B',
+    explanation: "WebUI.executeJavaScript() runs the given JS string in the browser via Selenium's JavascriptExecutor. Use it to scroll, manipulate DOM state, or interact with elements that Selenium can't reach natively.",
   },
   {
     id: 29, category: 'Advanced Keywords', type: 'Multiple Choice',
-    question: 'Your test needs to change a test object\'s XPath at runtime without editing the Object Repository. Which keyword supports this?',
+    question: "Your test needs to change a test object's XPath at runtime without editing the Object Repository. Which keyword supports this?",
     options: [
       { letter: 'A', text: 'WebUI.updateObjectProperty()' },
       { letter: 'B', text: 'WebUI.modifyObjectProperty()' },
@@ -316,6 +346,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.overrideXPath()' },
     ],
     correctLetter: 'B',
+    explanation: "WebUI.modifyObjectProperty() dynamically overrides a test object's property (e.g. xpath, css) at runtime. This enables data-driven locators without maintaining separate repository objects per variant.",
   },
 
   // ── API TESTING ───────────────────────────────────────────────────────────
@@ -329,6 +360,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WS.verifyResponseStatusCode()' },
     ],
     correctLetter: 'B',
+    explanation: 'WS.sendRequestAndVerify() combines sending the request and running all defined verifications in one step. WS.sendRequest() only sends — you must add separate verify calls manually.',
   },
   {
     id: 31, category: 'API Testing', type: 'Multiple Choice',
@@ -340,11 +372,13 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WS.verifyElementPropertyValue()' },
     ],
     correctLetter: 'C',
+    explanation: 'WS.verifyResponseStatusCode(response, 200) asserts an exact HTTP status code. WS.verifyResponseStatusCodeInRange() is for range checks like 200–299.',
   },
   {
     id: 32, category: 'API Testing', type: 'Fill in the Blank',
-    question: 'Complete the keyword that extracts a value from a JSON response body by property path:\nString token = WS.______________________(response, \'data.token\')',
+    question: "Complete the keyword that extracts a value from a JSON response body by property path:\nString token = WS.______________________(response, 'data.token')",
     correctAnswer: 'getElementPropertyValue',
+    explanation: "WS.getElementPropertyValue() traverses the JSON response body using a dot-notation path (e.g. 'data.token') and returns the value as a String. Use it to extract tokens, IDs, or any nested field.",
   },
 
   // ── MOBILE TESTING ────────────────────────────────────────────────────────
@@ -358,6 +392,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'Mobile.press()' },
     ],
     correctLetter: 'C',
+    explanation: 'Mobile.tap() performs a single-finger tap on the target element, which is the mobile equivalent of a mouse click. The second parameter is the timeout in seconds.',
   },
   {
     id: 34, category: 'Mobile Testing', type: 'Multiple Choice',
@@ -369,6 +404,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'Mobile.longClick()' },
     ],
     correctLetter: 'C',
+    explanation: 'Mobile.tapAndHold() holds a tap on the element for a duration, triggering long-press interactions like context menus or selection handles in native mobile apps.',
   },
   {
     id: 35, category: 'Mobile Testing', type: 'Multiple Choice',
@@ -380,6 +416,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'Mobile.findAndScroll()' },
     ],
     correctLetter: 'B',
+    explanation: 'Mobile.scrollToText() scrolls the screen in the specified direction until the given text becomes visible. Useful for lists or pages with dynamic or virtualized content.',
   },
   {
     id: 36, category: 'Mobile Testing', type: 'Spot the Bug',
@@ -391,7 +428,8 @@ export const questions: Question[] = [
       { letter: 'D', text: "Mobile.verifyElementVisible(findTestObject('txt_welcome'), 5)" },
     ],
     correctLetter: 'A',
-    correctAnswer: "Line 1: Mobile.openBrowser() is a WebUI keyword — the correct keyword is Mobile.startApplication()",
+    correctAnswer: "Line A: Mobile.openBrowser() is a WebUI keyword — the correct keyword is Mobile.startApplication()",
+    explanation: "Mobile.openBrowser() does not exist in the Mobile keyword library — it belongs to WebUI. The correct keyword to launch a native mobile app is Mobile.startApplication(), passing the app ID or path.",
   },
 
   // ── DESKTOP TESTING ───────────────────────────────────────────────────────
@@ -405,6 +443,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WebUI.openBrowser() with the exe path' },
     ],
     correctLetter: 'C',
+    explanation: 'Windows.startApplication() launches a desktop application by its executable path. It initialises the WinAppDriver session needed to interact with native Windows UI elements.',
   },
   {
     id: 38, category: 'Desktop Testing', type: 'Multiple Choice',
@@ -416,6 +455,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'Windows.killProcess()' },
     ],
     correctLetter: 'B',
+    explanation: 'Windows.closeApplication() closes the desktop application and ends the WinAppDriver session. Always call this in the test teardown to avoid leaving orphaned processes.',
   },
 
   // ── CROSS-PLATFORM COMPARISON ─────────────────────────────────────────────
@@ -429,6 +469,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'Mobile.setText() and Windows.setText() are deprecated in favour of WebUI.setText()' },
     ],
     correctLetter: 'B',
+    explanation: "Katalon's keyword libraries follow a consistent naming convention across platforms. WebUI, Mobile, and Windows each have their own setText() that targets the appropriate driver — Selenium, Appium, or WinAppDriver.",
   },
   {
     id: 40, category: 'Cross-Platform', type: 'Multiple Choice',
@@ -440,6 +481,7 @@ export const questions: Question[] = [
       { letter: 'D', text: 'WS.takeScreenshot()' },
     ],
     correctLetter: 'D',
+    explanation: 'There is no WS.takeScreenshot() — the WS (Web Service) library is for API testing and has no UI to capture. Screenshots are available in WebUI (full page and element) and Mobile testing.',
   },
 
   // ── DRAG TO ORDER: FULL WEB TEST ──────────────────────────────────────────
@@ -447,40 +489,43 @@ export const questions: Question[] = [
     id: 41, category: 'Browser Handling', type: 'Drag to Order',
     question: 'Drag to arrange the correct lifecycle order for a basic web UI test in Katalon Studio:',
     orderedSteps: [
-      'WebUI.openBrowser(\'\') — launch the browser',
+      "WebUI.openBrowser('') — launch the browser",
       'WebUI.navigateToUrl(url) — go to the target page',
       'WebUI.waitForPageLoad(timeout) — ensure the page is ready',
       'Interact with elements (click, setText, verify, etc.)',
       'WebUI.closeBrowser() — close the browser',
     ],
+    explanation: 'The standard test lifecycle: open browser → navigate → wait for load → interact → close. Skipping waitForPageLoad can cause intermittent failures when elements are not yet rendered.',
   },
 
   // ── SPOT THE BUG: VERIFICATION ────────────────────────────────────────────
   {
     id: 42, category: 'Verification', type: 'Spot the Bug',
-    question: 'This verification block has one incorrect keyword. Click the buggy line:\n(Hint: one keyword is being used to check a negative condition but is the wrong choice)',
+    question: 'This verification block has one incorrect keyword. Click the buggy line:\n(Hint: one keyword is asserting something it should not be)',
     options: [
       { letter: 'A', text: "WebUI.verifyElementPresent(findTestObject('msg_success'), 5)" },
       { letter: 'B', text: "WebUI.verifyTextPresent('Order confirmed')" },
       { letter: 'C', text: "WebUI.verifyElementVisible(findTestObject('msg_error'))" },
-      { letter: 'D', text: "WebUI.verifyTextPresent('Error occurred')" },
+      { letter: 'D', text: "WebUI.verifyTextNotPresent('Error occurred')" },
     ],
     correctLetter: 'C',
-    correctAnswer: "Line 3: verifyElementVisible() asserts the error message IS visible — to confirm no error, the correct keyword is WebUI.verifyElementNotPresent() or verifyTextNotPresent()",
+    correctAnswer: "Line C: verifyElementVisible() asserts the error message IS visible — to confirm no error, the correct keyword is verifyElementNotPresent() or verifyTextNotPresent()",
+    explanation: "verifyElementVisible(msg_error) would PASS if an error message is shown — the opposite of what this test intends. To confirm no error is present, use verifyElementNotPresent() or verifyTextNotPresent().",
   },
 
   // ── API SPOT THE BUG ──────────────────────────────────────────────────────
   {
     id: 43, category: 'API Testing', type: 'Spot the Bug',
-    question: 'This API test sends a request and checks the response. Click the buggy line:\n(Hint: check whether the correct keyword is used to assert an exact HTTP status code)',
+    question: 'This API test sends a request and checks the response. Click the buggy line:\n(Hint: one keyword is used where a simpler, more direct alternative exists)',
     options: [
       { letter: 'A', text: "def response = WS.sendRequest(findTestObject('POST_login'))" },
       { letter: 'B', text: "WS.verifyResponseStatusCodeInRange(response, 200, 200)" },
       { letter: 'C', text: "WS.verifyElementPropertyValue(response, 'data.role', 'admin')" },
-      { letter: 'D', text: "String token = WS.getElementPropertyValue(response, 'data.token')" },
+      { letter: 'D', text: "WS.getElementPropertyValue(response, 'data.token')" },
     ],
     correctLetter: 'B',
-    correctAnswer: "Line 2: verifyResponseStatusCodeInRange(200, 200) works but is needlessly verbose — WS.verifyResponseStatusCode(response, 200) is the correct, direct keyword for an exact status code check",
+    correctAnswer: "Line B: verifyResponseStatusCodeInRange(200, 200) is needlessly verbose — WS.verifyResponseStatusCode(response, 200) is the direct keyword for an exact status code",
+    explanation: "WS.verifyResponseStatusCodeInRange(response, 200, 200) technically works but using the same value for min and max is a misuse of the range keyword. WS.verifyResponseStatusCode(response, 200) is cleaner and the correct choice.",
   },
 ];
 

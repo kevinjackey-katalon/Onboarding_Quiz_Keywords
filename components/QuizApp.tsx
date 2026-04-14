@@ -136,7 +136,7 @@ export default function QuizApp() {
 
   if (screen === 'admin') return <AdminScreen onBack={goHome} />;
   if (screen === 'results' && result) return <ResultsScreen result={result} onRetake={retake} onHome={goHome} />;
-  if (screen === 'quiz') return <QuizScreen onSubmit={submitQuiz} onHome={goHome} />;
+  if (screen === 'quiz') return <QuizScreen onSubmit={submitQuiz} onHome={goHome} userName={name} />;
 
   return (
     <LandingScreen

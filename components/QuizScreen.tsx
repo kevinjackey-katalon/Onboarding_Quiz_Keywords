@@ -7,505 +7,312 @@ import type { UserAnswers } from './QuizApp';
 interface Props {
   onSubmit: (answers: UserAnswers) => void;
   onHome: () => void;
+  userName: string;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Browser Handling': '#60a5fa',
-  'UI Interaction': '#f59e0b',
-  'Verification': '#34d399',
-  'Wait Handling': '#a78bfa',
-  'Frame & Window Handling': '#f87171',
-  'Alert Handling': '#fb923c',
-  'Advanced Keywords': '#e879f9',
-  'API Testing': '#38bdf8',
-  'Mobile Testing': '#4ade80',
-  'Desktop Testing': '#facc15',
-  'Cross-Platform': '#94a3b8',
-};
-
-/** Returns true if the stored answer for a question is correct */
 function checkAnswer(q: (typeof questions)[0], answer: string | string[]): boolean {
-  if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') {
-    return answer === q.correctLetter;
-  }
+  if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') return answer === q.correctLetter;
   if (q.type === 'Fill in the Blank') {
-    const user = String(answer).trim().toLowerCase().replace(/['"]/g, '');
-    const correct = (q.correctAnswer || '').trim().toLowerCase().replace(/['"]/g, '');
-    return user === correct;
+    const u = String(answer).trim().toLowerCase().replace(/['"]/g, '');
+    const c = (q.correctAnswer || '').trim().toLowerCase().replace(/['"]/g, '');
+    return u === c;
   }
   if (q.type === 'Drag to Order') {
-    const userOrder = answer as string[];
-    const correctOrder = q.orderedSteps || [];
-    return (
-      userOrder.length === correctOrder.length &&
-      userOrder.every((step, idx) => step === correctOrder[idx])
-    );
+    const uo = answer as string[];
+    const co = q.orderedSteps || [];
+    return uo.length === co.length && uo.every((s, i) => s === co[i]);
   }
   return false;
 }
 
-export default function QuizScreen({ onSubmit, onHome }: Props) {
+export default function QuizScreen({ onSubmit, onHome, userName }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<UserAnswers>({});
-  // revealed: set of question ids for which feedback has been shown
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [dragOrder, setDragOrder] = useState<string[]>([]);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [fillDraft, setFillDraft] = useState('');
-  const [showConfirm, setShowConfirm] = useState(false);
-  const dragItem = useRef<number | null>(null);
+  const [streak, setStreak] = useState(0);
+  const dragSrc = useRef<string | null>(null);
 
   const q = questions[currentIndex];
-  const catColor = CATEGORY_COLORS[q.category] || '#94a3b8';
   const isRevealed = revealed.has(q.id);
   const currentAnswer = answers[q.id];
-  const isCorrect = isRevealed && currentAnswer !== undefined
-    ? checkAnswer(q, currentAnswer)
-    : null;
+  const isCorrect = isRevealed && currentAnswer !== undefined ? checkAnswer(q, currentAnswer) : null;
   const answeredCount = Object.keys(answers).length;
   const progress = (currentIndex / questions.length) * 100;
 
-  // Sync fill-in draft when navigating
   useEffect(() => {
-    if (q.type === 'Fill in the Blank') {
-      setFillDraft((answers[q.id] as string) || '');
-    }
+    if (q.type === 'Fill in the Blank') setFillDraft((answers[q.id] as string) || '');
   }, [currentIndex, q.id, q.type]);
 
-  // Init drag order when switching to drag question
   useEffect(() => {
     if (q.type === 'Drag to Order') {
       const existing = answers[q.id] as string[] | undefined;
-      if (existing && existing.length > 0) {
-        setDragOrder(existing);
-      } else {
-        const shuffled = [...(q.orderedSteps || [])].sort(() => Math.random() - 0.5);
-        setDragOrder(shuffled);
-      }
+      if (existing?.length) { setDragOrder(existing); }
+      else { setDragOrder([...(q.orderedSteps || [])].sort(() => Math.random() - .5)); }
     }
   }, [currentIndex, q.id, q.type, q.orderedSteps]);
 
-  /** Commit an answer and immediately reveal feedback */
   const commitAnswer = (val: string | string[]) => {
-    if (isRevealed) return; // already locked
+    if (isRevealed) return;
     setAnswers(prev => ({ ...prev, [q.id]: val }));
     setRevealed(prev => new Set(prev).add(q.id));
+    const ok = checkAnswer(q, val);
+    setStreak(ok ? s => s + 1 : 0);
   };
 
-  // Drag handlers (only active before reveal)
-  const handleDragStart = (idx: number) => { dragItem.current = idx; };
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
+  // Drag handlers
+  const handleDragStart = (id: string) => { dragSrc.current = id; };
+  const handleDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); if (!isRevealed) setDragOverId(id); };
+  const handleDrop = (e: React.DragEvent, id: string) => {
     e.preventDefault();
-    if (!isRevealed) setDragOverIndex(idx);
-  };
-  const handleDrop = (idx: number) => {
-    if (isRevealed || dragItem.current === null || dragItem.current === idx) return;
+    if (isRevealed || !dragSrc.current || dragSrc.current === id) return;
     const newOrder = [...dragOrder];
-    const [removed] = newOrder.splice(dragItem.current, 1);
-    newOrder.splice(idx, 0, removed);
+    const from = newOrder.indexOf(dragSrc.current);
+    const to = newOrder.indexOf(id);
+    if (from === -1 || to === -1) return;
+    if (from < to) newOrder.splice(to + 1, 0, newOrder[from]); else newOrder.splice(to, 0, newOrder[from]);
+    const removeIdx = from < to ? from : from + 1;
+    newOrder.splice(removeIdx, 1);
     setDragOrder(newOrder);
     setAnswers(prev => ({ ...prev, [q.id]: newOrder }));
-    dragItem.current = null;
-    setDragOverIndex(null);
+    dragSrc.current = null; setDragOverId(null);
   };
-  const handleDragEnd = () => { dragItem.current = null; setDragOverIndex(null); };
+  const handleDragEnd = () => { dragSrc.current = null; setDragOverId(null); };
   const moveStep = (idx: number, dir: -1 | 1) => {
     if (isRevealed) return;
-    const newOrder = [...dragOrder];
-    const target = idx + dir;
-    if (target < 0 || target >= newOrder.length) return;
-    [newOrder[idx], newOrder[target]] = [newOrder[target], newOrder[idx]];
-    setDragOrder(newOrder);
-    setAnswers(prev => ({ ...prev, [q.id]: newOrder }));
+    const t = idx + dir;
+    if (t < 0 || t >= dragOrder.length) return;
+    const no = [...dragOrder]; [no[idx], no[t]] = [no[t], no[idx]];
+    setDragOrder(no); setAnswers(prev => ({ ...prev, [q.id]: no }));
   };
 
   const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(i => i + 1);
-    } else {
-      setShowConfirm(true);
-    }
-  };
-  const handlePrev = () => { if (currentIndex > 0) setCurrentIndex(i => i - 1); };
-  const handleSubmit = () => { onSubmit(answers); };
-
-  // ── OPTION STYLE HELPER ───────────────────────────────────────────────────
-  const getOptionStyle = (letter: string) => {
-    const selected = currentAnswer === letter;
-    const correct = q.correctLetter === letter;
-
-    if (!isRevealed) {
-      return {
-        bg: selected ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
-        border: selected ? '#3b82f6' : 'rgba(255,255,255,0.10)',
-        color: selected ? '#93c5fd' : '#cbd5e1',
-        badgeBg: selected ? '#3b82f6' : 'rgba(255,255,255,0.08)',
-        badgeColor: selected ? 'white' : '#94a3b8',
-        cursor: 'pointer',
-      };
-    }
-
-    // Post-reveal
-    if (correct) {
-      return {
-        bg: 'rgba(52,211,153,0.15)',
-        border: '#34d399',
-        color: '#d1fae5',
-        badgeBg: '#34d399',
-        badgeColor: '#064e3b',
-        cursor: 'default',
-      };
-    }
-    if (selected && !correct) {
-      return {
-        bg: 'rgba(248,113,113,0.15)',
-        border: '#f87171',
-        color: '#fee2e2',
-        badgeBg: '#f87171',
-        badgeColor: '#7f1d1d',
-        cursor: 'default',
-      };
-    }
-    return {
-      bg: 'rgba(255,255,255,0.02)',
-      border: 'rgba(255,255,255,0.06)',
-      color: '#475569',
-      badgeBg: 'rgba(255,255,255,0.05)',
-      badgeColor: '#475569',
-      cursor: 'default',
-    };
+    if (currentIndex < questions.length - 1) setCurrentIndex(i => i + 1);
+    else onSubmit(answers);
   };
 
-  // ── FEEDBACK BANNER ────────────────────────────────────────────────────────
-  const renderFeedback = () => {
-    if (!isRevealed) return null;
-    const correct = isCorrect;
+  const typeLabel: Record<string, string> = { 'Fill in the Blank': 'Fill in the Blank', 'Spot the Bug': 'Spot the Bug', 'Drag to Order': 'Order the Steps' };
+  const isSpecial = q.type !== 'Multiple Choice';
 
-    // For drag/fill, build a plain-text explanation of the correct answer
-    let explanation = '';
-    if (q.type === 'Fill in the Blank') {
-      explanation = `Correct answer: ${q.correctAnswer}`;
-    } else if (q.type === 'Drag to Order') {
-      if (!correct) {
-        explanation = 'Correct order:\n' +
-          (q.orderedSteps || []).map((s, i) => `${i + 1}. ${s}`).join('\n');
-      }
-    } else if ((q.type === 'Spot the Bug') && q.correctAnswer) {
-      explanation = q.correctAnswer;
-    }
-
-    return (
-      <div style={{
-        marginTop: 20,
-        padding: '16px 20px',
-        borderRadius: 12,
-        background: correct ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
-        border: `1px solid ${correct ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)'}`,
-        display: 'flex',
-        gap: 14,
-        alignItems: 'flex-start',
-      }}>
-        <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>
-          {correct ? '✅' : '❌'}
-        </span>
-        <div>
-          <p style={{
-            margin: '0 0 4px',
-            fontWeight: 700,
-            fontSize: 15,
-            color: correct ? '#34d399' : '#f87171',
-          }}>
-            {correct ? 'Correct!' : 'Not quite.'}
-          </p>
-          {explanation && (
-            <p style={{
-              margin: 0,
-              fontSize: 13,
-              color: '#94a3b8',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-line',
-              fontFamily: q.type === 'Fill in the Blank' || q.type === 'Spot the Bug'
-                ? 'monospace' : 'inherit',
-            }}>
-              {explanation}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // ── QUESTION RENDERERS ────────────────────────────────────────────────────
-  const renderQuestion = () => {
-    if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') {
-      const isCode = q.type === 'Spot the Bug';
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {(q.options || []).map(opt => {
-            const s = getOptionStyle(opt.letter);
-            const isCorrectOpt = isRevealed && q.correctLetter === opt.letter;
-            return (
-              <button
-                key={opt.letter}
-                onClick={() => !isRevealed && commitAnswer(opt.letter)}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 14,
-                  padding: '14px 18px',
-                  background: s.bg,
-                  border: `2px solid ${s.border}`,
-                  borderRadius: 12,
-                  cursor: s.cursor as 'pointer' | 'default',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  color: s.color,
-                  width: '100%',
-                }}
-              >
-                <span style={{
-                  minWidth: 28, height: 28, borderRadius: 8,
-                  background: s.badgeBg,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, color: s.badgeColor, flexShrink: 0,
-                  transition: 'all 0.2s',
-                }}>
-                  {isRevealed && isCorrectOpt ? '✓' :
-                   isRevealed && currentAnswer === opt.letter && !isCorrectOpt ? '✗' :
-                   opt.letter}
-                </span>
-                <span style={{
-                  fontSize: isCode ? 13 : 15,
-                  fontFamily: isCode ? 'monospace' : 'inherit',
-                  lineHeight: 1.5, paddingTop: 2,
-                }}>
-                  {opt.text}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      );
-    }
-
-    if (q.type === 'Fill in the Blank') {
-      const fillCorrect = isRevealed && isCorrect;
-      const fillWrong = isRevealed && !isCorrect;
-      return (
-        <div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input
-              type="text"
-              value={fillDraft}
-              onChange={e => { if (!isRevealed) setFillDraft(e.target.value); }}
-              onKeyDown={e => { if (e.key === 'Enter' && fillDraft.trim() && !isRevealed) commitAnswer(fillDraft.trim()); }}
-              disabled={isRevealed}
-              placeholder="Type your answer here…"
-              style={{
-                flex: 1,
-                background: fillCorrect ? 'rgba(52,211,153,0.1)' : fillWrong ? 'rgba(248,113,113,0.1)' : 'rgba(255,255,255,0.06)',
-                border: `2px solid ${fillCorrect ? '#34d399' : fillWrong ? '#f87171' : 'rgba(255,255,255,0.15)'}`,
-                borderRadius: 12, padding: '14px 18px',
-                color: '#f1f5f9', fontSize: 16, outline: 'none',
-                fontFamily: 'monospace',
-                opacity: isRevealed ? 0.75 : 1,
-                transition: 'all 0.2s',
-              }}
-            />
-            {!isRevealed && (
-              <button
-                onClick={() => { if (fillDraft.trim()) commitAnswer(fillDraft.trim()); }}
-                disabled={!fillDraft.trim()}
-                style={{
-                  padding: '14px 20px', borderRadius: 12, border: 'none',
-                  background: fillDraft.trim() ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255,255,255,0.08)',
-                  color: fillDraft.trim() ? 'white' : '#4b5563',
-                  fontSize: 14, fontWeight: 700, cursor: fillDraft.trim() ? 'pointer' : 'default',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Check →
-              </button>
-            )}
-          </div>
-          {!isRevealed && (
-            <p style={{ color: '#64748b', fontSize: 13, marginTop: 8 }}>
-              Case-sensitive. Press Enter or click Check to submit.
-            </p>
-          )}
-        </div>
-      );
-    }
-
-    if (q.type === 'Drag to Order') {
-      const dragCorrect = isRevealed && isCorrect;
-      const correctOrder = q.orderedSteps || [];
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {!isRevealed && (
-            <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 4px' }}>
-              Drag items or use ↑↓ to reorder, then click <strong>Check Order</strong>.
-            </p>
-          )}
-          {dragOrder.map((step, idx) => {
-            const positionCorrect = isRevealed && step === correctOrder[idx];
-            const positionWrong = isRevealed && step !== correctOrder[idx];
-            return (
-              <div
-                key={step}
-                draggable={!isRevealed}
-                onDragStart={() => handleDragStart(idx)}
-                onDragOver={e => handleDragOver(e, idx)}
-                onDrop={() => handleDrop(idx)}
-                onDragEnd={handleDragEnd}
-                className={isRevealed ? '' : 'drag-item'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
-                  background: positionCorrect ? 'rgba(52,211,153,0.1)' :
-                              positionWrong ? 'rgba(248,113,113,0.08)' :
-                              dragOverIndex === idx ? 'rgba(99,179,237,0.1)' : 'rgba(255,255,255,0.05)',
-                  border: `2px solid ${positionCorrect ? '#34d399' :
-                                       positionWrong ? '#f87171' :
-                                       dragOverIndex === idx ? '#63b3ed' : 'rgba(255,255,255,0.10)'}`,
-                  borderRadius: 10, transition: 'all 0.2s',
-                }}
-              >
-                <span style={{
-                  minWidth: 24, height: 24, borderRadius: 6,
-                  background: positionCorrect ? '#34d399' : positionWrong ? '#f87171' : 'rgba(255,255,255,0.1)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700,
-                  color: positionCorrect ? '#064e3b' : positionWrong ? '#7f1d1d' : '#94a3b8',
-                }}>
-                  {positionCorrect ? '✓' : positionWrong ? '✗' : idx + 1}
-                </span>
-                <span style={{ flex: 1, color: positionCorrect ? '#d1fae5' : positionWrong ? '#fee2e2' : '#cbd5e1', fontSize: 14, lineHeight: 1.4 }}>
-                  {!isRevealed && '⠿ '}{step}
-                </span>
-                {!isRevealed && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <button onClick={() => moveStep(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', color: idx === 0 ? '#374151' : '#94a3b8', cursor: idx === 0 ? 'default' : 'pointer', fontSize: 14, padding: '2px 6px' }}>▲</button>
-                    <button onClick={() => moveStep(idx, 1)} disabled={idx === dragOrder.length - 1} style={{ background: 'none', border: 'none', color: idx === dragOrder.length - 1 ? '#374151' : '#94a3b8', cursor: idx === dragOrder.length - 1 ? 'default' : 'pointer', fontSize: 14, padding: '2px 6px' }}>▼</button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {!isRevealed && (
-            <button
-              onClick={() => commitAnswer(dragOrder)}
-              style={{
-                marginTop: 8, padding: '12px', borderRadius: 10, border: 'none',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              Check Order →
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  // ── CONFIRM SUBMIT MODAL ──────────────────────────────────────────────────
-  if (showConfirm) {
-    const unanswered = questions.length - answeredCount;
-    return (
-      <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '40px 36px', maxWidth: 480, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-          <h2 style={{ color: '#f1f5f9', fontSize: 22, fontWeight: 700, margin: '0 0 12px' }}>Submit Quiz?</h2>
-          {unanswered > 0 ? (
-            <p style={{ color: '#f87171', fontSize: 15, margin: '0 0 24px' }}>
-              You have <strong>{unanswered}</strong> unanswered question{unanswered !== 1 ? 's' : ''}. These will be marked incorrect.
-            </p>
-          ) : (
-            <p style={{ color: '#94a3b8', fontSize: 15, margin: '0 0 24px' }}>
-              All {questions.length} questions answered. Ready to see your results?
-            </p>
-          )}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => setShowConfirm(false)} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#94a3b8', fontSize: 15, cursor: 'pointer' }}>
-              ← Review
-            </button>
-            <button onClick={handleSubmit} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-              Submit Quiz
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── MAIN LAYOUT ────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>← Exit</button>
-        <span style={{ color: '#94a3b8', fontSize: 14, fontWeight: 600 }}>{answeredCount} / {questions.length} answered</span>
-        <span style={{ color: '#64748b', fontSize: 13 }}>{currentIndex + 1} of {questions.length}</span>
-      </div>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 24px 80px' }}>
 
-      {/* Progress bar */}
-      <div style={{ height: 4, background: 'rgba(255,255,255,0.08)' }}>
-        <div style={{ height: '100%', background: 'linear-gradient(90deg, #3b82f6, #60a5fa)', width: `${progress}%`, transition: 'width 0.3s ease' }} />
-      </div>
-
-      <div style={{ flex: 1, maxWidth: 760, margin: '0 auto', width: '100%', padding: '32px 24px', display: 'flex', flexDirection: 'column' }}>
-        {/* Category badge + type */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <span style={{ background: `${catColor}20`, border: `1px solid ${catColor}60`, color: catColor, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            {q.category}
-          </span>
-          <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#64748b', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-            {q.type === 'Multiple Choice' ? '🔘 Multiple Choice' :
-             q.type === 'Fill in the Blank' ? '✏️ Fill in the Blank' :
-             q.type === 'Spot the Bug' ? '🐛 Spot the Bug' : '🔀 Drag to Order'}
-          </span>
+        {/* Quiz header */}
+        <div style={{ textAlign: 'center', marginBottom: 36, animation: 'fadeDown .6s ease both' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', letterSpacing: 1, marginBottom: 4 }}>
+            Good luck, {userName.split(' ')[0]}!
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700 }}>Katalon Keywords Quiz</h2>
         </div>
 
-        {/* Question text */}
-        <div style={{ marginBottom: 24 }}>
-          <h2 style={{ color: '#f1f5f9', fontSize: 20, fontWeight: 600, lineHeight: 1.5, margin: 0, whiteSpace: 'pre-line' }}>
-            Q{currentIndex + 1}. {q.question}
-          </h2>
+        {/* Progress */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <div style={{ flex: 1, height: 4, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg, var(--accent), var(--accent2))', borderRadius: 4, width: `${progress}%`, transition: 'width .5s cubic-bezier(.4,0,.2,1)' }} />
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+            {currentIndex} / {questions.length}
+          </div>
         </div>
 
-        {/* Answer area + inline feedback */}
-        <div style={{ flex: 1 }}>
-          {renderQuestion()}
-          {renderFeedback()}
+        {/* Streak banner */}
+        {streak >= 3 && (
+          <div style={{ background: 'rgba(79,255,176,.1)', border: '1px solid rgba(79,255,176,.25)', borderRadius: 8, padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', textAlign: 'center', marginBottom: 16, animation: 'fadeIn .3s ease' }}>
+            🔥 {streak} correct in a row!
+          </div>
+        )}
+
+        {/* Question card */}
+        <div
+          key={currentIndex}
+          style={{
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+            padding: 36, marginBottom: 20, position: 'relative', overflow: 'hidden',
+            animation: 'slideUp .4s ease both',
+          }}
+        >
+          {/* top accent line */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--accent), var(--accent2))', borderRadius: '16px 16px 0 0' }} />
+
+          {/* Category / exercise pill */}
+          {isSpecial ? (
+            <div style={{ display: 'inline-block', background: 'rgba(203,166,247,.1)', border: '1px solid rgba(203,166,247,.3)', color: '#cba6f7', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '3px 10px', borderRadius: 4, marginBottom: 14 }}>
+              ⌨ {typeLabel[q.type]} — {q.category}
+            </div>
+          ) : (
+            <div style={{ display: 'inline-block', background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--accent2)', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 4, marginBottom: 14 }}>
+              {q.category}
+            </div>
+          )}
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', letterSpacing: 1, marginBottom: 8 }}>
+            Question {currentIndex + 1} of {questions.length}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.5, color: 'var(--text)', marginBottom: 28, whiteSpace: 'pre-line' }}>
+            {q.question}
+          </div>
+
+          {/* ── MCQ / SPOT THE BUG ── */}
+          {(q.type === 'Multiple Choice' || q.type === 'Spot the Bug') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(q.options || []).map((opt, i) => {
+                const selected = currentAnswer === opt.letter;
+                const isCorrectOpt = q.correctLetter === opt.letter;
+                let anim = '';
+                if (isRevealed && isCorrectOpt) anim = 'pulse-correct .4s ease';
+                else if (isRevealed && selected && !isCorrectOpt) anim = 'shake .4s ease';
+                const isCode = q.type === 'Spot the Bug';
+                return (
+                  <button
+                    key={opt.letter}
+                    disabled={isRevealed}
+                    onClick={() => !isRevealed && commitAnswer(opt.letter)}
+                    style={{
+                      background: isRevealed && isCorrectOpt ? 'rgba(79,255,176,.08)' : isRevealed && selected && !isCorrectOpt ? 'rgba(255,95,135,.08)' : 'var(--surface2)',
+                      border: `1.5px solid ${isRevealed && isCorrectOpt ? 'var(--accent)' : isRevealed && selected && !isCorrectOpt ? 'var(--accent3)' : 'var(--border)'}`,
+                      borderRadius: 10, padding: '14px 18px', cursor: isRevealed ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', width: '100%',
+                      fontSize: 14, color: isRevealed && (isCorrectOpt || (selected && !isCorrectOpt)) ? 'var(--text)' : isRevealed ? 'rgba(232,234,242,0.4)' : 'var(--text)',
+                      transition: 'border-color .2s, background .2s, transform .15s',
+                      opacity: isRevealed && !isCorrectOpt && !selected ? 0.55 : 1,
+                      animation: anim,
+                    }}
+                    onMouseOver={e => { if (!isRevealed) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent2)'; (e.currentTarget as HTMLElement).style.background = 'rgba(0,200,255,.05)'; (e.currentTarget as HTMLElement).style.transform = 'translateX(4px)'; } }}
+                    onMouseOut={e => { if (!isRevealed) { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface2)'; (e.currentTarget as HTMLElement).style.transform = 'translateX(0)'; } }}
+                  >
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                      background: isRevealed && isCorrectOpt ? 'var(--accent)' : isRevealed && selected && !isCorrectOpt ? 'var(--accent3)' : 'var(--bg)',
+                      border: `1px solid ${isRevealed && isCorrectOpt ? 'var(--accent)' : isRevealed && selected && !isCorrectOpt ? 'var(--accent3)' : 'var(--border)'}`,
+                      color: isRevealed && isCorrectOpt ? '#000' : isRevealed && selected && !isCorrectOpt ? '#fff' : 'var(--muted)',
+                      borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .2s, color .2s',
+                    }}>
+                      {opt.letter}
+                    </span>
+                    <span style={{ fontFamily: isCode ? 'var(--font-mono)' : 'inherit', fontSize: isCode ? 12.5 : 14, lineHeight: 1.6 }}>{opt.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── FILL IN THE BLANK ── */}
+          {q.type === 'Fill in the Blank' && (
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Complete the code</div>
+              <div style={{ background: '#0a0c10', border: '1px solid var(--border)', borderRadius: 10, padding: '18px 20px', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.9, color: '#cdd6f4', marginBottom: 20, overflowX: 'auto', whiteSpace: 'pre' }}>
+                {q.question.includes('\n') ? q.question.split('\n').slice(1).join('\n').replace('______', '').replace(/_{3,}/g, '') : ''}
+                <input
+                  value={fillDraft}
+                  onChange={e => { if (!isRevealed) setFillDraft(e.target.value); }}
+                  onKeyDown={e => { if (e.key === 'Enter' && fillDraft.trim() && !isRevealed) commitAnswer(fillDraft.trim()); }}
+                  disabled={isRevealed}
+                  placeholder="..."
+                  style={{
+                    background: 'rgba(79,255,176,.08)', border: 'none',
+                    borderBottom: `2px solid ${isRevealed ? (isCorrect ? 'var(--accent)' : 'var(--accent3)') : 'var(--accent)'}`,
+                    color: isRevealed ? (isCorrect ? 'var(--accent)' : 'var(--accent3)') : 'var(--accent)',
+                    fontFamily: 'var(--font-mono)', fontSize: 12.5, padding: '0 6px', outline: 'none', minWidth: 180, transition: 'border-color .2s',
+                  }}
+                />
+              </div>
+              {!isRevealed && (
+                <button
+                  onClick={() => { if (fillDraft.trim()) commitAnswer(fillDraft.trim()); }}
+                  disabled={!fillDraft.trim()}
+                  style={{ background: 'transparent', border: `1.5px solid ${fillDraft.trim() ? 'var(--accent)' : 'var(--border)'}`, color: fillDraft.trim() ? 'var(--accent)' : 'var(--muted)', borderRadius: 8, padding: '9px 22px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, cursor: fillDraft.trim() ? 'pointer' : 'default', transition: 'background .2s', display: 'block', marginBottom: 4 }}>
+                  Check Answer
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── DRAG TO ORDER ── */}
+          {q.type === 'Drag to Order' && (
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Drag to put in correct order</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {dragOrder.map((step, idx) => {
+                  const posOk = isRevealed && step === (q.orderedSteps || [])[idx];
+                  const posWrong = isRevealed && step !== (q.orderedSteps || [])[idx];
+                  return (
+                    <div
+                      key={step}
+                      draggable={!isRevealed}
+                      onDragStart={() => handleDragStart(step)}
+                      onDragOver={e => handleDragOver(e, step)}
+                      onDrop={e => handleDrop(e, step)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        background: posOk ? 'rgba(79,255,176,.07)' : posWrong ? 'rgba(255,95,135,.07)' : dragOverId === step ? 'rgba(0,200,255,.07)' : 'var(--surface2)',
+                        border: `1.5px solid ${posOk ? 'var(--accent)' : posWrong ? 'var(--accent3)' : dragOverId === step ? 'var(--accent2)' : 'var(--border)'}`,
+                        borderRadius: 8, padding: '11px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: '#cdd6f4',
+                        cursor: isRevealed ? 'default' : 'grab', display: 'flex', alignItems: 'center', gap: 10,
+                        transition: 'border-color .2s, background .2s, transform .15s', userSelect: 'none',
+                      }}
+                    >
+                      {!isRevealed && <span style={{ color: 'var(--muted)', fontSize: 16, flexShrink: 0, lineHeight: 1 }}>⠿</span>}
+                      <span style={{ fontSize: 10, color: posOk ? 'var(--accent)' : posWrong ? 'var(--accent3)' : 'var(--muted)', background: 'var(--bg)', border: `1px solid ${posOk ? 'var(--accent)' : posWrong ? 'var(--accent3)' : 'var(--border)'}`, borderRadius: 4, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700 }}>{idx + 1}</span>
+                      <span style={{ flex: 1 }}>{step}</span>
+                      {!isRevealed && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <button onClick={() => moveStep(idx, -1)} disabled={idx === 0} style={{ background: 'none', border: 'none', color: idx === 0 ? 'var(--border)' : 'var(--muted)', cursor: idx === 0 ? 'default' : 'pointer', fontSize: 12, padding: '1px 4px', lineHeight: 1 }}>▲</button>
+                          <button onClick={() => moveStep(idx, 1)} disabled={idx === dragOrder.length - 1} style={{ background: 'none', border: 'none', color: idx === dragOrder.length - 1 ? 'var(--border)' : 'var(--muted)', cursor: idx === dragOrder.length - 1 ? 'default' : 'pointer', fontSize: 12, padding: '1px 4px', lineHeight: 1 }}>▼</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {!isRevealed && (
+                <button onClick={() => commitAnswer(dragOrder)} style={{ background: 'transparent', border: '1.5px solid var(--accent)', color: 'var(--accent)', borderRadius: 8, padding: '9px 22px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'background .2s', display: 'block', marginBottom: 4 }}>
+                  Check Order
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── FEEDBACK STRIP ── */}
+          {isRevealed && (
+            <div style={{
+              display: 'block', marginTop: 20, padding: '14px 18px', borderRadius: 10,
+              fontSize: 14, lineHeight: 1.5,
+              borderLeft: `3px solid ${isCorrect ? 'var(--accent)' : 'var(--accent3)'}`,
+              background: isCorrect ? 'rgba(79,255,176,.07)' : 'rgba(255,95,135,.07)',
+              color: isCorrect ? '#a7ffe0' : '#ffb3c6',
+              animation: 'fadeIn .3s ease',
+            }}>
+              <strong style={{ fontWeight: 600, display: 'block', marginBottom: 4 }}>
+                {isCorrect ? '✓ Correct!' : '✗ Not quite.'}
+              </strong>
+              {q.explanation}
+            </div>
+          )}
         </div>
 
-        {/* Navigation — Next only unlocks after feedback shown (or on revisit) */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 32, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <button
-            onClick={handlePrev}
-            disabled={currentIndex === 0}
-            style={{ padding: '12px 24px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: currentIndex === 0 ? '#374151' : '#94a3b8', fontSize: 15, cursor: currentIndex === 0 ? 'default' : 'pointer' }}
-          >
-            ← Back
-          </button>
+        {/* Next button */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
           <button
             onClick={handleNext}
             disabled={!isRevealed}
             style={{
-              flex: 1, padding: '12px 24px', borderRadius: 10, border: 'none',
-              background: isRevealed
-                ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
-                : 'rgba(255,255,255,0.08)',
-              color: isRevealed ? 'white' : '#4b5563',
-              fontSize: 15, fontWeight: 700,
+              background: isRevealed ? 'var(--accent)' : 'transparent',
+              color: isRevealed ? '#000' : 'var(--muted)',
+              border: isRevealed ? 'none' : '1px solid var(--border)',
+              borderRadius: 8, padding: '12px 28px',
+              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, letterSpacing: '.5px',
               cursor: isRevealed ? 'pointer' : 'default',
-              transition: 'all 0.2s',
+              transition: 'opacity .2s, transform .15s',
+              display: isRevealed ? 'block' : 'block',
+              opacity: isRevealed ? 1 : 0.4,
             }}
+            onMouseOver={e => { if (isRevealed) { (e.target as HTMLElement).style.opacity = '.88'; (e.target as HTMLElement).style.transform = 'translateY(-1px)'; } }}
+            onMouseOut={e => { if (isRevealed) { (e.target as HTMLElement).style.opacity = '1'; (e.target as HTMLElement).style.transform = 'translateY(0)'; } }}
           >
-            {isRevealed
-              ? (currentIndex < questions.length - 1 ? 'Next →' : 'Review & Submit →')
-              : 'Answer to continue…'}
+            {currentIndex < questions.length - 1 ? 'Next →' : 'See Results'}
           </button>
         </div>
       </div>
