@@ -4,6 +4,7 @@ export interface QuizResult {
   id: string;
   name: string;
   organisation: string;
+  quizName: string;
   score: number;
   total: number;
   passed: boolean;
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       id: Date.now().toString(),
       name: body.name || 'Unknown',
       organisation: body.organisation || '',
+      quizName: body.quizName || 'Katalon Keywords & Advanced Quiz',
       score: body.score,
       total: body.total,
       passed: body.passed,

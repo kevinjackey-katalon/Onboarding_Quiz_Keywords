@@ -6,6 +6,7 @@ interface QuizResultRecord {
   id: string;
   name: string;
   organisation: string;
+  quizName: string;
   score: number;
   total: number;
   passed: boolean;
@@ -80,7 +81,7 @@ export default function AdminScreen({ onBack }: Props) {
   };
 
   const exportCSV = () => {
-    const headers = ['Name', 'Organisation', 'Score', 'Percentage', 'Result', 'Date', 'Weakest Area', ...allCategories.map(c => `${c} Score`)];
+    const headers = ['Name', 'Organisation', 'Quiz Name', 'Score', 'Percentage', 'Result', 'Date', 'Weakest Area', ...allCategories.map(c => `${c} Score`)];
     const rows = results.map(r => {
       const pct = Math.round((r.score / r.total) * 100);
       const catScores = allCategories.map(c => {
@@ -90,6 +91,7 @@ export default function AdminScreen({ onBack }: Props) {
       return [
         `"${r.name}"`,
         `"${r.organisation || ''}"`,
+        `"${r.quizName || ''}"`,
         `${r.score}/${r.total}`,
         `${pct}%`,
         r.passed ? 'Pass' : 'Fail',
@@ -234,7 +236,7 @@ export default function AdminScreen({ onBack }: Props) {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                     <thead>
                       <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                        {['#', 'Name', 'Organisation', 'Score', 'Result', 'Date & Time', 'Weakest Area'].map(h => (
+                        {['#', 'Name', 'Organisation', 'Quiz Name', 'Score', 'Result', 'Date & Time', 'Weakest Area'].map(h => (
                           <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -247,6 +249,7 @@ export default function AdminScreen({ onBack }: Props) {
                             <td style={{ padding: '12px 16px', color: '#4a5568' }}>{idx + 1}</td>
                             <td style={{ padding: '12px 16px', color: '#e2e8f0', fontWeight: 600 }}>{r.name}</td>
                             <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{r.organisation || '—'}</td>
+                            <td style={{ padding: '12px 16px', color: '#94a3b8' }}>{r.quizName || '—'}</td>
                             <td style={{ padding: '12px 16px', color: r.passed ? '#34d399' : '#f87171', fontWeight: 700 }}>{r.score}/{r.total} ({pct}%)</td>
                             <td style={{ padding: '12px 16px' }}>
                               <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: r.passed ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)', color: r.passed ? '#34d399' : '#f87171' }}>

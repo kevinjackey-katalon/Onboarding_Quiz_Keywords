@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { questions, PASS_MARK, CATEGORIES } from '@/lib/questions';
 
 interface Props {
-  onStart: (name: string, organisation: string) => void;
+  onStart: (name: string, organisation: string, quizName: string) => void;
   onAdmin: () => void;
 }
 
 export default function LandingScreen({ onStart, onAdmin }: Props) {
   const [name, setName] = useState('');
   const [organisation, setOrganisation] = useState('');
+  const [quizName, setQuizName] = useState('');
   const [error, setError] = useState('');
 
   const handleStart = () => {
@@ -19,7 +20,7 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
       return;
     }
     setError('');
-    onStart(name.trim(), organisation.trim());
+    onStart(name.trim(), organisation.trim(), quizName.trim() || 'Katalon Keywords & Advanced Quiz');
   };
 
   return (
@@ -49,12 +50,13 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
             <span style={{ background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Keywords &amp; Advanced Quiz</span>
           </h1>
           <p style={{ color: '#94a3b8', fontSize: 16, margin: 0, lineHeight: 1.6 }}>
-            Enter your name to begin. Your results will be recorded for training review.
+            Enter your details to begin. Your results will be recorded for training review.
           </p>
         </div>
 
         {/* Form card */}
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '36px 32px', marginBottom: 32 }}>
+          {/* Full Name */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Full Name *</label>
             <input
@@ -66,7 +68,9 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
               style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${error ? '#f87171' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 15, outline: 'none' }}
             />
           </div>
-          <div style={{ marginBottom: 24 }}>
+
+          {/* Organisation */}
+          <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Organisation <span style={{ color: '#64748b', fontWeight: 400 }}>(optional)</span></label>
             <input
               type="text"
@@ -77,6 +81,20 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
               style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 15, outline: 'none' }}
             />
           </div>
+
+          {/* Quiz Name */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', color: '#94a3b8', fontSize: 13, fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Quiz Name <span style={{ color: '#64748b', fontWeight: 400 }}>(optional)</span></label>
+            <input
+              type="text"
+              value={quizName}
+              onChange={e => setQuizName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleStart()}
+              placeholder="e.g. Onboarding Cohort June 2025"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 15, outline: 'none' }}
+            />
+          </div>
+
           {error && <p style={{ color: '#f87171', fontSize: 13, margin: '0 0 16px' }}>{error}</p>}
           <button
             onClick={handleStart}

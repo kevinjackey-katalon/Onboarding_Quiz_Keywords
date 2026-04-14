@@ -17,6 +17,7 @@ export interface UserAnswers {
 export interface QuizResult {
   name: string;
   organisation: string;
+  quizName: string;
   score: number;
   total: number;
   passed: boolean;
@@ -25,7 +26,7 @@ export interface QuizResult {
   answers: UserAnswers;
 }
 
-function gradeAnswers(answers: UserAnswers): Omit<QuizResult, 'name' | 'organisation' | 'answers'> {
+function gradeAnswers(answers: UserAnswers): Omit<QuizResult, 'name' | 'organisation' | 'quizName' | 'answers'> {
   const categoryScores: Record<string, { correct: number; total: number }> = {};
 
   for (const cat of CATEGORIES) {
@@ -87,12 +88,14 @@ export default function QuizApp() {
   const [screen, setScreen] = useState<Screen>('landing');
   const [name, setName] = useState('');
   const [organisation, setOrganisation] = useState('');
+  const [quizName, setQuizName] = useState('');
   const [answers, setAnswers] = useState<UserAnswers>({});
   const [result, setResult] = useState<QuizResult | null>(null);
 
-  const startQuiz = useCallback((n: string, org: string) => {
+  const startQuiz = useCallback((n: string, org: string, qn: string) => {
     setName(n);
     setOrganisation(org);
+    setQuizName(qn);
     setAnswers({});
     setResult(null);
     setScreen('quiz');
@@ -103,6 +106,7 @@ export default function QuizApp() {
     const quizResult: QuizResult = {
       name,
       organisation,
+      quizName,
       answers: finalAnswers,
       ...graded,
     };
@@ -120,7 +124,7 @@ export default function QuizApp() {
     } catch {
       // silently fail
     }
-  }, [name, organisation]);
+  }, [name, organisation, quizName]);
 
   const retake = useCallback(() => {
     setAnswers({});
