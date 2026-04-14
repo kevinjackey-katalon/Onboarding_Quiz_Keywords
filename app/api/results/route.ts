@@ -12,16 +12,18 @@ export interface QuizResult {
   weakestCategory: string;
 }
 
-// Upstash Redis — env vars are UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
-// These are auto-injected when you connect the "upstash-kj-tracking" database in Vercel
+// Upstash Redis via @upstash/redis
+// Env vars injected by Vercel when upstash-kj-tracking is connected:
+//   KV_REST_API_URL   → https://supreme-moray-97366.upstash.io
+//   KV_REST_API_TOKEN → the read/write token
 async function getRedis() {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     return null;
   }
   const { Redis } = await import('@upstash/redis');
   return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN,
   });
 }
 
@@ -29,7 +31,10 @@ export async function GET() {
   try {
     const redis = await getRedis();
     if (!redis) {
-      return NextResponse.json({ results: [], notice: 'Upstash Redis not configured — connect upstash-kj-tracking in Vercel Storage.' });
+      return NextResponse.json({
+        results: [],
+        notice: 'Upstash Redis not configured — connect upstash-kj-tracking in Vercel Storage.',
+      });
     }
     const results = await redis.lrange<QuizResult>('quiz_results', 0, -1);
     return NextResponse.json({ results: results || [] });
