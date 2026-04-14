@@ -14,10 +14,12 @@ export interface UserAnswers {
   [questionId: number]: string | string[];
 }
 
+const QUIZ_NAME = 'Katalon Keywords & Advanced Quiz';
+
 export interface QuizResult {
   name: string;
   organisation: string;
-  quizName: string;
+  quiz: string;
   score: number;
   total: number;
   passed: boolean;
@@ -26,7 +28,7 @@ export interface QuizResult {
   answers: UserAnswers;
 }
 
-function gradeAnswers(answers: UserAnswers): Omit<QuizResult, 'name' | 'organisation' | 'quizName' | 'answers'> {
+function gradeAnswers(answers: UserAnswers): Omit<QuizResult, 'name' | 'organisation' | 'quiz' | 'answers'> {
   const categoryScores: Record<string, { correct: number; total: number }> = {};
 
   for (const cat of CATEGORIES) {
@@ -63,7 +65,6 @@ function gradeAnswers(answers: UserAnswers): Omit<QuizResult, 'name' | 'organisa
     }
   }
 
-  // Find weakest category
   let weakest = CATEGORIES[0];
   let worstPct = 1;
   for (const [cat, scores] of Object.entries(categoryScores)) {
@@ -88,14 +89,12 @@ export default function QuizApp() {
   const [screen, setScreen] = useState<Screen>('landing');
   const [name, setName] = useState('');
   const [organisation, setOrganisation] = useState('');
-  const [quizName, setQuizName] = useState('');
   const [answers, setAnswers] = useState<UserAnswers>({});
   const [result, setResult] = useState<QuizResult | null>(null);
 
-  const startQuiz = useCallback((n: string, org: string, qn: string) => {
+  const startQuiz = useCallback((n: string, org: string) => {
     setName(n);
     setOrganisation(org);
-    setQuizName(qn);
     setAnswers({});
     setResult(null);
     setScreen('quiz');
@@ -106,7 +105,7 @@ export default function QuizApp() {
     const quizResult: QuizResult = {
       name,
       organisation,
-      quizName,
+      quiz: QUIZ_NAME,
       answers: finalAnswers,
       ...graded,
     };
@@ -114,7 +113,6 @@ export default function QuizApp() {
     setAnswers(finalAnswers);
     setScreen('results');
 
-    // Save to API
     try {
       await fetch('/api/results', {
         method: 'POST',
@@ -124,7 +122,7 @@ export default function QuizApp() {
     } catch {
       // silently fail
     }
-  }, [name, organisation, quizName]);
+  }, [name, organisation]);
 
   const retake = useCallback(() => {
     setAnswers({});

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export interface QuizResult {
   id: string;
+  quiz: string;
   name: string;
   organisation: string;
-  quizName: string;
   score: number;
   total: number;
   passed: boolean;
@@ -13,10 +13,6 @@ export interface QuizResult {
   weakestCategory: string;
 }
 
-// Upstash Redis via @upstash/redis
-// Env vars injected by Vercel when upstash-kj-tracking is connected:
-//   KV_REST_API_URL   → https://supreme-moray-97366.upstash.io
-//   KV_REST_API_TOKEN → the read/write token
 async function getRedis() {
   if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
     return null;
@@ -51,9 +47,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const result: QuizResult = {
       id: Date.now().toString(),
+      quiz: body.quiz || 'Katalon Keywords & Advanced Quiz',
       name: body.name || 'Unknown',
       organisation: body.organisation || '',
-      quizName: body.quizName || 'Katalon Keywords & Advanced Quiz',
       score: body.score,
       total: body.total,
       passed: body.passed,
