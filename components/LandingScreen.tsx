@@ -47,7 +47,7 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
           <span style={{ color: 'var(--accent)' }}>Keywords Reference</span>
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 32, lineHeight: 1.6 }}>
-          Test your knowledge of Katalon keywords across Web, API, Mobile and Desktop. Your results will be recorded for training review.
+          20 questions drawn randomly from a bank of 44, covering Web, API, Mobile and Desktop keywords. Results are recorded for training review.
         </p>
 
         <input
@@ -103,7 +103,7 @@ export default function LandingScreen({ onStart, onAdmin }: Props) {
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
           {[
-            { val: questions.length, lbl: 'Questions' },
+            { val: 20, lbl: 'Questions' },
             { val: CATEGORIES.length, lbl: 'Topics' },
             { val: `${Math.round(PASS_MARK * 100)}%`, lbl: 'Pass Mark' },
           ].map(m => (

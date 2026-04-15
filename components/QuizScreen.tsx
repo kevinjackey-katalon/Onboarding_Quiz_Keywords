@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { questions } from '@/lib/questions';
+import type { Question } from '@/lib/questions';
 import type { UserAnswers } from './QuizApp';
 
 interface Props {
   onSubmit: (answers: UserAnswers) => void;
   onHome: () => void;
   userName: string;
+  questions: Question[];
 }
 
-function checkAnswer(q: (typeof questions)[0], answer: string | string[]): boolean {
+function checkAnswer(q: Question, answer: string | string[]): boolean {
   if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') return answer === q.correctLetter;
   if (q.type === 'Fill in the Blank') {
     const u = String(answer).trim().toLowerCase().replace(/['"]/g, '');
@@ -25,7 +26,7 @@ function checkAnswer(q: (typeof questions)[0], answer: string | string[]): boole
   return false;
 }
 
-export default function QuizScreen({ onSubmit, onHome, userName }: Props) {
+export default function QuizScreen({ onSubmit, onHome, userName, questions }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<UserAnswers>({});
   const [revealed, setRevealed] = useState<Set<number>>(new Set());

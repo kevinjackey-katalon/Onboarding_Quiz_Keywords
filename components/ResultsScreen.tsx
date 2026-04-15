@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { questions } from '@/lib/questions';
+import { questions as ALL_QUESTIONS } from '@/lib/questions';
 import type { QuizResult } from './QuizApp';
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 }
 
 function getAnswerSummary(qIndex: number, result: QuizResult) {
-  const q = questions[qIndex];
+  const q = ALL_QUESTIONS[qIndex];
   const userRaw = result.answers[q.id];
 
   if (q.type === 'Multiple Choice' || q.type === 'Spot the Bug') {
@@ -118,10 +118,10 @@ export default function ResultsScreen({ result, onRetake, onHome }: Props) {
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: 1, color: 'var(--muted)', textTransform: 'uppercase' }}>
             Question Review
           </div>
-          {questions.map((q, idx) => {
+          {ALL_QUESTIONS.filter(q => result.activeQuestions?.includes(q.id) ?? true).map((q, idx) => {
             const { ok, yours, correct } = getAnswerSummary(idx, result);
             return (
-              <div key={q.id} style={{ padding: '14px 24px', borderBottom: idx < questions.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'flex-start', gap: 14, fontSize: 13 }}>
+              <div key={q.id} style={{ padding: '14px 24px', borderBottom: idx < (result.activeQuestions?.length ?? ALL_QUESTIONS.length) - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'flex-start', gap: 14, fontSize: 13 }}>
                 <div style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{ok ? '✅' : '❌'}</div>
                 <div>
                   <div style={{ color: 'var(--text)', lineHeight: 1.4, fontSize: 13 }}>{q.question.split('\n')[0]}</div>

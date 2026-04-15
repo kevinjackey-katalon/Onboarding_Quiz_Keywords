@@ -3,16 +3,15 @@
 import { useState, useEffect } from 'react';
 
 interface QuizResultRecord {
-  id: string;
   quiz: string;
   name: string;
-  organisation: string;
+  org: string;           // shared DB uses 'org' not 'organisation'
   score: number;
   total: number;
+  pct: number;           // shared DB stores pre-computed percentage
   passed: boolean;
-  date: string;
-  categoryScores: Record<string, { correct: number; total: number }>;
-  weakestCategory: string;
+  catScores: Record<string, { correct: number; total: number }>; // shared DB uses 'catScores'
+  ts: string;            // shared DB uses 'ts' not 'date'
 }
 
 interface Props { onBack: () => void; }
@@ -36,7 +35,7 @@ export default function AdminScreen({ onBack }: Props) {
 
   const load = async () => {
     setLoading(true);
-    try { const r = await fetch('/api/results'); const d = await r.json(); setResults(d.results || []); }
+    try { const r = await fetch('/api/results'); const d = await r.json(); setResults(Array.isArray(d) ? d : (d.results || [])); }
     catch { setResults([]); }
     finally { setLoading(false); }
   };
@@ -53,8 +52,8 @@ export default function AdminScreen({ onBack }: Props) {
     const headers = ['#','Quiz','Name','Organisation','Score','Percentage','Passed','Timestamp',...CATS];
     const rows = results.map((r, i) => {
       const pct = Math.round((r.score / r.total) * 100);
-      const cats = CATS.map(c => { const d = r.categoryScores?.[c]; return d ? `${d.correct}/${d.total}` : 'N/A'; });
-      return [i+1, `"${r.quiz||''}"`, `"${r.name}"`, `"${r.organisation||''}"`, `${r.score}/${r.total}`, `${pct}%`, r.passed?'Yes':'No', r.date, ...cats];
+      const cats = CATS.map(c => { const cs = r.catScores || (r as any).categoryScores; const d = cs?.[c]; return d ? `${d.correct}/${d.total}` : 'N/A'; });
+      return [i+1, `"${r.quiz||''}"`, `"${r.name}"`, `"${r.org||''}"`, `${r.score}/${r.total}`, `${r.pct??pct}%`, r.passed?'Yes':'No', r.ts||'—', ...cats];
     });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -108,7 +107,7 @@ export default function AdminScreen({ onBack }: Props) {
   // Category aggregation
   const agg: Record<string, { correct: number; total: number }> = {};
   CATS.forEach(c => { agg[c] = { correct: 0, total: 0 }; });
-  results.forEach(r => { if (r.categoryScores) Object.entries(r.categoryScores).forEach(([c, d]) => { if (agg[c]) { agg[c].correct += d.correct; agg[c].total += d.total; } }); });
+  results.forEach(r => { const cs = r.catScores || (r as any).categoryScores; if (cs) Object.entries(cs).forEach(([c, d]: [string, any]) => { if (agg[c]) { agg[c].correct += d.correct; agg[c].total += d.total; } }); });
 
   return (
     <div style={{ position: 'relative', zIndex: 1 }}>
@@ -196,22 +195,19 @@ export default function AdminScreen({ onBack }: Props) {
                       </div>
                     </td></tr>
                   ) : [...results].reverse().map((r, i) => {
-                    const pct = Math.round((r.score/r.total)*100);
+                    const pct = r.pct ?? Math.round((r.score/r.total)*100);
                     const bc = pct >= 75 ? { bg: 'rgba(79,255,176,.15)', color: 'var(--accent)' } : pct >= 60 ? { bg: 'rgba(255,209,102,.15)', color: '#ffd166' } : { bg: 'rgba(255,95,135,.15)', color: 'var(--accent3)' };
-                    const d = new Date(r.date);
-                    const ds = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-                    const ts = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-                    let weak = '—';
-                    if (r.categoryScores) { let mp = Infinity, mc = ''; Object.entries(r.categoryScores).forEach(([c, data]) => { if (data.total > 0) { const p2 = data.correct/data.total; if (p2 < mp) { mp = p2; mc = c; } } }); if (mc) weak = `${mc} (${Math.round(mp*100)}%)`; }
+                            let weak = '—';
+                    const cs2 = r.catScores || (r as any).categoryScores; if (cs2) { let mp = Infinity, mc = ''; Object.entries(cs2 as Record<string,{correct:number;total:number}>).forEach(([c, data]) => { if (data.total > 0) { const p2 = data.correct/data.total; if (p2 < mp) { mp = p2; mc = c; } } }); if (mc) weak = `${mc} (${Math.round(mp*100)}%)`; }
                     return (
-                      <tr key={r.id || i} style={{}} onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.02)'} onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                      <tr key={r.ts || i} style={{}} onMouseOver={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.02)'} onMouseOut={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{results.length - i}</td>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--accent2)', fontSize: 12 }}>{r.quiz || '—'}</td>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{r.name}</td>
-                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12 }}>{r.organisation || '—'}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12 }}>{r.org || (r as any).organisation || '—'}</td>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)' }}>{r.score}/{r.total} <span style={{ color: 'var(--muted)' }}>({pct}%)</span></td>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)' }}><span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, background: bc.bg, color: bc.color }}>{pct >= 75 ? 'PASS' : 'FAIL'}</span></td>
-                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{ds} {ts}</td>
+                        <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{(() => { try { const d2 = new Date(r.ts || (r as any).date); return d2.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + ' ' + d2.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}); } catch { return r.ts || '—'; } })()}</td>
                         <td style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', color: 'var(--accent3)', fontSize: 12 }}>{weak}</td>
                       </tr>
                     );
