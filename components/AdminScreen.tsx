@@ -27,6 +27,7 @@ export default function AdminScreen({ onBack }: Props) {
   const [pwError, setPwError] = useState(false);
   const [results, setResults] = useState<QuizResultRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [quizSortDir, setQuizSortDir] = useState<'asc' | 'desc' | null>(null);
 
   const login = () => {
     if (pw === PASS_PASSWORD) { setAuthed(true); setPwError(false); load(); }
@@ -89,6 +90,10 @@ export default function AdminScreen({ onBack }: Props) {
     );
   }
 
+  const toggleQuizSort = () => {
+    setQuizSortDir(d => d === 'asc' ? 'desc' : d === 'desc' ? null : 'asc');
+  };
+
   const total = results.length;
   const passed = results.filter(r => r.passed).length;
   const avg = total ? Math.round(results.reduce((s, r) => s + Math.round((r.score/r.total)*100), 0) / total) : 0;
@@ -108,6 +113,13 @@ export default function AdminScreen({ onBack }: Props) {
   const agg: Record<string, { correct: number; total: number }> = {};
   CATS.forEach(c => { agg[c] = { correct: 0, total: 0 }; });
   results.forEach(r => { const cs = r.catScores || (r as any).categoryScores; if (cs) Object.entries(cs).forEach(([c, d]: [string, any]) => { if (agg[c]) { agg[c].correct += d.correct; agg[c].total += d.total; } }); });
+
+  const displayRows = (() => {
+    const rows = [...results].reverse();
+    if (quizSortDir === 'asc')  rows.sort((a, b) => (a.quiz || '').localeCompare(b.quiz || ''));
+    if (quizSortDir === 'desc') rows.sort((a, b) => (b.quiz || '').localeCompare(a.quiz || ''));
+    return rows;
+  })();
 
   return (
     <div style={{ position: 'relative', zIndex: 1 }}>
@@ -182,7 +194,22 @@ export default function AdminScreen({ onBack }: Props) {
                 <thead>
                   <tr>
                     {['#','Quiz','Name','Organisation','Score','Result','Date & Time','Weakest Area'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--muted)', background: 'var(--surface2)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={h}
+                        onClick={h === 'Quiz' ? toggleQuizSort : undefined}
+                        style={{
+                          padding: '12px 16px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10,
+                          letterSpacing: 1, textTransform: 'uppercase',
+                          color: h === 'Quiz' && quizSortDir ? 'var(--accent2)' : 'var(--muted)',
+                          background: 'var(--surface2)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap',
+                          cursor: h === 'Quiz' ? 'pointer' : 'default',
+                          userSelect: h === 'Quiz' ? 'none' : 'auto',
+                        }}
+                        title={h === 'Quiz' ? 'Sort by Quiz' : undefined}
+                      >
+                        {h === 'Quiz'
+                          ? <>{h} <span style={{ opacity: quizSortDir ? 1 : 0.4 }}>{quizSortDir === 'asc' ? '↑' : quizSortDir === 'desc' ? '↓' : '⇅'}</span></>
+                          : h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -194,7 +221,7 @@ export default function AdminScreen({ onBack }: Props) {
                         <p style={{ fontSize: 14, lineHeight: 1.6 }}>No quiz attempts yet.<br />Results will appear here once trainees complete the quiz.</p>
                       </div>
                     </td></tr>
-                  ) : [...results].reverse().map((r, i) => {
+                  ) : displayRows.map((r, i) => {
                     const pct = r.pct ?? Math.round((r.score/r.total)*100);
                     const bc = pct >= 75 ? { bg: 'rgba(79,255,176,.15)', color: 'var(--accent)' } : pct >= 60 ? { bg: 'rgba(255,209,102,.15)', color: '#ffd166' } : { bg: 'rgba(255,95,135,.15)', color: 'var(--accent3)' };
                             let weak = '—';
